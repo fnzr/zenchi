@@ -10,14 +10,6 @@ import cache
 load_dotenv()
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-s_handler = logging.StreamHandler()
-f_handler = logging.FileHandler("log.txt")
-f_handler.setLevel(logging.INFO)
-s_handler.setLevel(logging.DEBUG)
-
-logger.addHandler(s_handler)
-logger.addHandler(f_handler)
 
 MAX_RECEIVE_SIZE = 4096
 PROTOVER_PARAMETER = 3
