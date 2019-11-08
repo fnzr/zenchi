@@ -26,7 +26,7 @@ class BannedError(APIError):
 
     def __init__(self, reason):
 
-        super().__init__("555 BANNED. %s", reason)
+        super().__init__(f"555 BANNED. {reason}", reason)
 
 
 class InvalidCredentialsError(APIError):
@@ -49,14 +49,15 @@ class ClientBannedError(APIError):
 
     def __init__(self, reason):
         super().__init__((
-            "504 CLIENT BANNED. %s |"
+            f"504 CLIENT BANNED. {reason} |"
             "(it's not you, it's me). Update me."), reason)
 
 
 class UnhandledResponseError(APIError):
 
     def __init__(self, data):
-        super().__init__("The following response was not handled:\n%s", data)
+        super().__init__(
+            f"The following response was not handled: {data}", data)
 
 
 class EndpointError(ValueError):
