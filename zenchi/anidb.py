@@ -124,15 +124,18 @@ class API:
 
         if cached_response is None:
             self.socket.send(packet.encode(ENCODING))
-            response = self.socket.recv(MAX_RECEIVE_SIZE).decode(ENCODING)
-            cache.save(command, message, response)
+            api_response = self.socket.recv(MAX_RECEIVE_SIZE).decode(ENCODING)
+            cache.save(command, message, api_response)
         else:
             logger.info("Found cached response. Last update: %s",
                         cached_response['updated'].strftime('%x, %X'))
-            response = cached_response['response']
-        logger.debug(response)
+            api_response = cached_response['response']
+        logger.debug(api_response)
 
-        code = int(response[:3])
+        code = int(api_response[:3])
+        result = callback(code, api_response)
+        if result is not None:
+            return result
         if code == 505:
             raise APIError(code, "Invalid parameter in packet. See logs.")
         if code == 598:
@@ -145,16 +148,17 @@ class API:
             logger.info("[%d] Invalid or expired session. Trying to login.",
                         code)
             self.auth(use_cache=False)
+            return self.send(command, args, callback)
         if code in (600, 601, 602):
             logger.info("[%d] Server unavailable. Delaying and resending.",
                         code)
             sleep(30)
-            self.send(command, args, callback)
+            return self.send(command, args, callback)
         if code == 604:
             logger.info("[%d] Server timeout. Delaying and resending.", code)
             sleep(5)
-            self.send(command, args, callback)
-        return callback(code, response)
+            return self.send(command, args, callback)
+        raise APIError(code, "Unhandled api response. This is not allowed.")
 
     @endpoint
     def auth(self,
@@ -277,7 +281,10 @@ class API:
             }: Server response.
         """
         def cb(code, response):
-            port = int(response.split('\n')[1]) if nat else None
+            if code == 300:
+                port = int(response.split('\n')[1]) if nat else None
+            else:
+                port = None
             return dict(code=code, port=port)
 
         data = dict() if nat is None else dict(nat=nat)
@@ -309,11 +316,18 @@ class API:
             raise ValueError("Either aid or aname must be provided")
 
         def cb(code, response):
-            print(response)
-            data = response.splitlines()[1]
-            result = alookup.parse_response(amask, data)
-            result["code"] = code
-            return result
+            if code == 330:
+                message = "Could not find anime with "
+                if aid is None:
+                    message += f"aname [{aname}]"
+                else:
+                    message += f"aid [{aid}]"
+                raise APIError(code, message)
+            if code == 230:
+                data = response.splitlines()[1]
+                result = alookup.parse_response(amask, data)
+                result["code"] = code
+                return result
 
         data = dict(s=self.session)
         if aid is not None:
@@ -334,12 +348,13 @@ class API:
             if code == 333:
                 raise APIError(
                     code, f"parts [{part}] for aid [{aid}] not found")
-            parts = response.splitlines()[1].split('|')
-            return {
-                'code': code,
-                'current_part': int(parts[0]),
-                'max_parts': int(parts[1]),
-                'description': parts[2]
-            }
+            if code == 233:
+                parts = response.splitlines()[1].split('|')
+                return {
+                    'code': code,
+                    'current_part': int(parts[0]),
+                    'max_parts': int(parts[1]),
+                    'description': parts[2]
+                }
         data = dict(aid=aid, part=part, s=self.session)
         return self.send("ANIMEDESC", data, cb)
