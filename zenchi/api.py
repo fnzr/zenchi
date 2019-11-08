@@ -113,7 +113,6 @@ class API:
         if cached_response is None:
             self.socket.send(packet.encode(ENCODING))
             api_response = self.socket.recv(MAX_RECEIVE_SIZE).decode(ENCODING)
-            cache.save(command, message, api_response)
         else:
             logger.info("Found cached response. Last update: %s",
                         cached_response['updated'].strftime('%x, %X'))
@@ -123,6 +122,7 @@ class API:
         code = int(api_response[:3])
         result = callback(code, api_response)
         if result is not None:
+            cache.save(command, message, api_response)
             return result, code
         if code == 505:
             raise errors.IllegalParameterError
