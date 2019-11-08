@@ -71,11 +71,9 @@ class API:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(('', in_port))
-        self.socket.connect(('api.anidb.net', 9000))
+        self.socket.connect((settings.ANIDB_SERVER, settings.ANIDB_PORT))
         self.encrypted_session = False
         self.session = session
-        if session:
-            self.encoding(settings.ENCODING)
         cache.setup()
 
     def send(self,
