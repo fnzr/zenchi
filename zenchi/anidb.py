@@ -4,11 +4,10 @@ import socket
 import logging
 from functools import wraps
 from time import sleep
-import os
-from dotenv import load_dotenv
 import cache
 import lookup.anime as alookup
-load_dotenv()
+import settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -80,21 +79,21 @@ class API:
         [type]: [description]
     """
 
-    def __init__(self, in_port=8000, session='', skip_cache=True):
+    def __init__(self, in_port=8000, session=''):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(('', in_port))
         self.socket.connect(('api.anidb.net', 9000))
         self.session = session
         if session:
-            self.encoding(ENCODING, skip_cache)
+            self.encoding(ENCODING)
         cache.setup()
 
     def send(self,
              command: str,
              args: dict,
              callback: [[int, str], dict],
-             skip_cache=False) -> dict:
+             use_cache=True) -> dict:
         """Sends an UDP packet to endpoint and synchronously wait and reads a response.
 
         See https://wiki.anidb.net/w/UDP_API_Definition
@@ -109,7 +108,7 @@ class API:
                 the code and the raw response and returns the parsed response.
                 This callback in defined in each endpoint.
                 Do note that most errors are handled in the decorator endpoint.
-            skip_cache (bool): Do not try to recover response from cache and
+            use_cache (bool): Do not try to recover response from cache and
                 sends request to AniDB.
         Returns:
             dict: Whatever callback returns.
@@ -118,8 +117,11 @@ class API:
         packet = f"{command} {message}"
         logger.info("Sending %s", packet)
 
-        cached_response = None if skip_cache else cache.restore(
-            command, message)
+        if settings.USE_CACHE:
+            cached_response = cache.restore(command, message)
+        else:
+            cached_response = None
+
         if cached_response is None:
             self.socket.send(packet.encode(ENCODING))
             response = self.socket.recv(MAX_RECEIVE_SIZE).decode(ENCODING)
@@ -142,7 +144,7 @@ class API:
         if code in (501, 506):
             logger.info("[%d] Invalid or expired session. Trying to login.",
                         code)
-            self.auth()
+            self.auth(use_cache=False)
         if code in (600, 601, 602):
             logger.info("[%d] Server unavailable. Delaying and resending.",
                         code)
@@ -162,7 +164,7 @@ class API:
              client_version=None,
              nat=None,
              attempt=1,
-             skip_cache=True) -> dict:
+             use_cache=True) -> dict:
         """Obtains new session.
             See https://wiki.anidb.net/w/UDP_API_Definition#AUTH:_Authing_to_the_AnimeDB # noqa
 
@@ -188,22 +190,16 @@ class API:
                 nat: str or None
             }
         """
-        if username is None:
-            username = os.getenv("ANIDB_USERNAME")
-        if password is None:
-            password = os.getenv("ANIDB_PASSWORD")
-        if client_name is None:
-            client_name = os.getenv("ANIDB_CLIENTNAME")
-        if client_version is None:
-            client_version = os.getenv("ANIDB_CLIENTVERSION")
         if attempt > 5:
             raise ValueError("Could not login after 5 attempts. Giving up.")
         data = {
-            "user": username,
-            "pass": password,
+            "user": settings.USERNAME if username is None else username,
+            "pass": settings.PASSWORD if password is None else password,
             "protover": PROTOVER_PARAMETER,
-            "client": client_name,
-            "clientver": client_version,
+            "client": settings.CLIENT_NAME if client_name is None
+            else client_name,
+            "clientver": settings.CLIENT_VERSION if client_version is None
+            else client_version,
             "enc": ENCODING
         }
         if nat is not None:
@@ -222,10 +218,10 @@ class API:
                 nat_info = parts[2] if nat == 1 else None
             return dict(code=code, session=self.session, nat=nat_info)
 
-        return self.send("AUTH", data, cb, skip_cache)
+        return self.send("AUTH", data, cb)
 
     @endpoint
-    def logout(self, skip_cache=True):
+    def logout(self):
         """Logout. See https://wiki.anidb.net/w/UDP_API_Definition#LOGOUT:_Logout
 
         Returns:
@@ -241,10 +237,10 @@ class API:
             self.session = ""
             return dict(code=code)
 
-        return self.send("LOGOUT", {"s": self.session}, cb, skip_cache)
+        return self.send("LOGOUT", {"s": self.session}, cb)
 
     @endpoint
-    def encoding(self, name, skip_cache=False):
+    def encoding(self, name):
         """Sets the encoding for the session. Used if session was restored.
         See https://wiki.anidb.net/w/UDP_API_Definition#ENCODING:_Change_Encoding_for_Session # noqa
 
@@ -264,10 +260,10 @@ class API:
                 raise APIError(code, f"Encoding [{name}] not supported")
             return dict(code=code)
 
-        return self.send("ENCODING", dict(name=name), cb, skip_cache)
+        return self.send("ENCODING", dict(name=name), cb)
 
     @endpoint
-    def ping(self, nat=None, skip_cache=True):
+    def ping(self, nat=None):
         """Pings the server.
         See https://wiki.anidb.net/w/UDP_API_Definition#PING:_Ping_Command
 
@@ -285,11 +281,11 @@ class API:
             return dict(code=code, port=port)
 
         data = dict() if nat is None else dict(nat=nat)
-        return self.send("PING", data, cb, skip_cache)
+        return self.send("PING", data, cb)
 
     @endpoint
     @authenticated
-    def anime(self, amask, aid=None, aname=None, skip_cache=False):
+    def anime(self, amask, aid=None, aname=None):
         """Retrieve anime data according to aid or aname.
 
         See https://wiki.anidb.net/w/UDP_API_Definition#ANIME:_Retrieve_Anime_Data # noqa
@@ -327,4 +323,23 @@ class API:
 
         if amask is not None:
             data["amask"] = format(amask, 'x')
-        return self.send("ANIME", data, cb, skip_cache)
+        return self.send("ANIME", data, cb)
+
+    @endpoint
+    @authenticated
+    def animedesc(self, aid: int, part: int):
+        def cb(code, response):
+            if code == 330:
+                raise APIError(code, f"aid [{aid}] not found")
+            if code == 333:
+                raise APIError(
+                    code, f"parts [{part}] for aid [{aid}] not found")
+            parts = response.splitlines()[1].split('|')
+            return {
+                'code': code,
+                'current_part': int(parts[0]),
+                'max_parts': int(parts[1]),
+                'description': parts[2]
+            }
+        data = dict(aid=aid, part=part, s=self.session)
+        return self.send("ANIMEDESC", data, cb)
