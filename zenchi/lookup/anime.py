@@ -1,5 +1,4 @@
-# TODO: parse data types
-
+from lookup import int_list, str_list, to_bool
 # Byte 1
 AID = 1 << 7 << 48
 DATE_FLAGS = 1 << 6 << 48
@@ -56,58 +55,58 @@ PARODY_COUNT = 1 << 3
 
 lookup = {
     # Byte 1
-    AID: 'AID',
-    DATE_FLAGS: 'DATE_FLAGS',
-    YEAR: 'YEAR',
-    TYPE: 'TYPE',
-    RELATED_AID_LIST: 'RELATED_AID_LIST',
-    RELATED_AID_TYPE: 'RELATED_AID_TYPE',
+    AID: ('AID', int),
+    DATE_FLAGS: ('DATE_FLAGS', int),
+    YEAR: ('YEAR', str),
+    TYPE: ('TYPE', str),
+    RELATED_AID_LIST: ('RELATED_AID_LIST', str_list),
+    RELATED_AID_TYPE: ('RELATED_AID_TYPE', str),
 
     # Byte 2
-    ROMAJI_NAME: 'ROMAJI_NAME',
-    KANJI_NAME: 'KANJI_NAME',
-    ENGLISH_NAME: 'ENGLISH_NAME',
-    OTHER_NAME: 'OTHER_NAME',
-    SHORT_NAME: 'SHORT_NAME',
-    SYNONYM_LIST: 'SYNONYM_LIST',
+    ROMAJI_NAME: ('ROMAJI_NAME', str),
+    KANJI_NAME: ('KANJI_NAME', str),
+    ENGLISH_NAME: ('ENGLISH_NAME', str),
+    OTHER_NAME: ('OTHER_NAME', str),
+    SHORT_NAME: ('SHORT_NAME', str_list),
+    SYNONYM_LIST: ('SYNONYM_LIST', str_list),
 
     # Byte 3
-    EPISODES: 'EPISODES',
-    HIGHEST_EPISODE_NUMBER: 'HIGHEST_EPISODE_NUMBER',
-    SPECIAL_EP_COUNT: 'SPECIAL_EP_COUNT',
-    AIR_DATE: 'AIR_DATE',
-    END_DATE: 'END_DATE',
-    URL: 'URL',
-    PICNAME: 'PICNAME',
+    EPISODES: ('EPISODES', int),
+    HIGHEST_EPISODE_NUMBER: ('HIGHEST_EPISODE_NUMBER', int),
+    SPECIAL_EP_COUNT: ('SPECIAL_EP_COUNT', int),
+    AIR_DATE: ('AIR_DATE', int),
+    END_DATE: ('END_DATE', int),
+    URL: ('URL', str),
+    PICNAME: ('PICNAME', str),
 
     # Byte 4
-    RATING: 'RATING',
-    VOTE_COUNT: 'VOTE_COUNT',
-    TEMP_RATING: 'TEMP_RATING',
-    TEMP_VOTE: 'TEMP_VOTE',
-    AVERATE_VIEW_RATING: 'AVERATE_VIEW_RATING',
-    REVIEW_COUNT: 'REVIEW_COUNT',
-    AWARD_LIST: 'AWARD_LIST',
-    IS_18_RESTRICTED: 'IS_18_RESTRICTED',
+    RATING: ('RATING', int),
+    VOTE_COUNT: ('VOTE_COUNT', int),
+    TEMP_RATING: ('TEMP_RATING', int),
+    TEMP_VOTE: ('TEMP_VOTE', int),
+    AVERATE_VIEW_RATING: ('AVERATE_VIEW_RATING', int),
+    REVIEW_COUNT: ('REVIEW_COUNT', int),
+    AWARD_LIST: ('AWARD_LIST', str),
+    IS_18_RESTRICTED: ('IS_18_RESTRICTED', to_bool),
 
     # Byte 5
-    ANN_ID: 'ANN_ID',
-    ALLCINEMA_ID: 'ALLCINEMA_ID',
-    ANIME_NFO_ID: 'ANIME_NFO_ID',
-    TAG_NAME_LIST: 'TAG_NAME_LIST',
-    TAG_ID_LIST: 'TAG_ID_LIST',
-    TAG_WEIGHT_LIST: 'TAG_WEIGHT_LIST',
-    DATE_RECORD_UPDATED: 'DATE_RECORD_UPDATED',
+    ANN_ID: ('ANN_ID', int),
+    ALLCINEMA_ID: ('ALLCINEMA_ID', int),
+    ANIME_NFO_ID: ('ANIME_NFO_ID', str),
+    TAG_NAME_LIST: ('TAG_NAME_LIST', str_list),
+    TAG_ID_LIST: ('TAG_ID_LIST', int_list),
+    TAG_WEIGHT_LIST: ('TAG_WEIGHT_LIST', int_list),
+    DATE_RECORD_UPDATED: ('DATE_RECORD_UPDATED', int),
 
     # Byte 6
-    CHARACTER_ID_LIST: 'CHARACTER_ID_LIST',
+    CHARACTER_ID_LIST: ('CHARACTER_ID_LIST', int_list),
 
     # Byte 7
-    SPECIALS_COUNT: 'SPECIALS_COUNT',
-    CREDITS_COUNT: 'CREDITS_COUNT',
-    OTHER_COUNT: 'OTHER_COUNT',
-    TRAILER_COUNT: 'TRAILER_COUNT',
-    PARODY_COUNT: 'PARODY_COUNT'
+    SPECIALS_COUNT: ('SPECIALS_COUNT', int),
+    CREDITS_COUNT: ('CREDITS_COUNT', int),
+    OTHER_COUNT: ('OTHER_COUNT', int),
+    TRAILER_COUNT: ('TRAILER_COUNT', int),
+    PARODY_COUNT: ('PARODY_COUNT', int)
 }
 
 
@@ -118,6 +117,7 @@ def parse_response(input, response):
     for i in range(56):
         index = input & (1 << i)
         if index != 0:
-            result[lookup[index]] = parts[part_index]
+            text, function = lookup[index]
+            result[text] = function(parts[part_index])
             part_index -= 1
     return result
