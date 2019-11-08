@@ -7,6 +7,7 @@ from time import sleep
 import os
 from dotenv import load_dotenv
 import cache
+import lookup.anime as alookup
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -76,14 +77,14 @@ class API:
     Returns:
         [type]: [description]
     """
-    def __init__(self, in_port=8000, session=''):
+    def __init__(self, in_port=8000, session='', skip_cache=True):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(('', in_port))
         self.socket.connect(('api.anidb.net', 9000))
         self.session = session
         if session:
-            self.encoding(ENCODING)
+            self.encoding(ENCODING, skip_cache)
         cache.setup()
 
     def send(self,
@@ -131,9 +132,9 @@ class API:
             raise APIError(code, "Invalid command in packet. See logs.")
         if code == 555:
             raise APIError(code, "BANNED. See ya.")
-        if code in (501, 502):
+        if code == 502:
             raise APIError(code, "Failed authenticating. Check credentials.")
-        if code == 506:
+        if code in (501, 506):
             logger.info("[%d] Invalid or expired session. Trying to login.",
                         code)
             self.auth()
@@ -280,7 +281,7 @@ class API:
 
     @endpoint
     @authenticated
-    def anime(self, aid=None, aname=None, amask=None, skip_cache=False):
+    def anime(self, amask, aid=None, aname=None, skip_cache=False):
         """Retrieve anime data according to aid or aname.
 
         See https://wiki.anidb.net/w/UDP_API_Definition#ANIME:_Retrieve_Anime_Data
@@ -288,23 +289,27 @@ class API:
         Args:
             aid (int, optional)
             aname (str, optional)
-            amask (str, optional): Hex string
+            amask (int, optional): 56bit integer
 
         Raises:
             ValueError: Raised if neither aid and aname are provided.
 
         Returns:
-            {}: TODO
+            {
+                code: int
+                ...
+            }: Dynamic dictionary, built according to amask parameter. 
+            See lookup.anime for all options.
         """
         if aid is None and aname is None:
             raise ValueError("Either aid or aname must be provided")
 
         def cb(code, response):
             print(response)
-            data = response.splitlines()[1].split("|")
-            with open("out.txt", 'w', encoding='utf-8') as f:
-                f.writelines(data)
-            return dict(code=code)
+            data = response.splitlines()[1]
+            result = alookup.parse_response(amask, data)
+            result["code"] = code
+            return result
 
         data = dict(s=self.session)
         if aid is not None:
@@ -313,5 +318,5 @@ class API:
             data['aname'] = aname
 
         if amask is not None:
-            data["amask"] = amask
+            data["amask"] = format(amask, 'x')
         return self.send("ANIME", data, cb)

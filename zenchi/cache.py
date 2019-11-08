@@ -12,9 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def setup():
-    client = pymongo.MongoClient('mongodb://%s:%s@127.0.0.1' %
-                                 ('admin', 'admin'),
-                                 serverSelectionTimeoutMS=MAX_SERVER_DELAY)
+    client = pymongo.MongoClient(serverSelectionTimeoutMS=MAX_SERVER_DELAY)
     try:
         client.admin.command('ismaster')
         this.db = client.anidb_cache

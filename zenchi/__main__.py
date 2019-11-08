@@ -1,6 +1,6 @@
 import logging
 import anidb
-
+import lookup.anime as alookup
 logging.basicConfig(
     level=logging.DEBUG,
     format="[%(asctime)s][%(levelname)s] %(name)s: %(message)s")
@@ -16,10 +16,11 @@ logger.addHandler(f_handler)
 
 
 def main():
-    api = anidb.API(14443, '')
-    api.ping(skip_cache=False)
+    api = anidb.API(14443, 'hpGJG', False)
+    #api.ping(skip_cache=False)
     #api.ping()
-    #api.anime(1)
+    amask = alookup.AID | alookup.YEAR | alookup.ROMAJI_NAME | alookup.ENGLISH_NAME
+    api.anime(amask, aid=1)
 
 
 if __name__ == '__main__':
