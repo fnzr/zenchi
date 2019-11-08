@@ -4,25 +4,15 @@ import socket
 import logging
 from functools import wraps
 from time import sleep
-import cache
-import lookup.anime as alookup
-import settings
-
+from zenchi import cache, settings
+from zenchi.lookup import anime as alookup
+import zenchi.errors as errors
 
 logger = logging.getLogger(__name__)
 
 MAX_RECEIVE_SIZE = 4096
 PROTOVER_PARAMETER = 3
 ENCODING = 'UTF8'
-
-
-class APIError(Exception):
-    """Generic error on communication with Anidb API."""
-
-    def __init__(self, code, message):
-        msg = f"AniDB returned code [{code}]. {message}"
-        logger.error(msg)
-        super().__init__(msg)
 
 
 def endpoint(f):
@@ -37,12 +27,9 @@ def endpoint(f):
     """
     @wraps(f)
     def wrapper(self, *args, **kwargs):
-        try:
-            data = f(self, *args, **kwargs)
-            logger.debug(data)
-            return data
-        except APIError as error:
-            raise error
+        data = f(self, *args, **kwargs)
+        logger.debug(data)
+        return data
 
     return wrapper
 
@@ -62,8 +49,9 @@ def authenticated(f):
     @wraps(f)
     def wrapper(self, *args, **kwargs):
         if not self.session:
-            logger.info("Session not found. Sending AUTH")
-            self.auth()
+            raise errors.EndpointError((
+                "This endpoint requires a session."
+                "Call .auth() to acquire one."))
         return f(self, *args, **kwargs)
 
     return wrapper
@@ -135,15 +123,15 @@ class API:
         code = int(api_response[:3])
         result = callback(code, api_response)
         if result is not None:
-            return result
+            return result, code
         if code == 505:
-            raise APIError(code, "Invalid parameter in packet. See logs.")
+            raise errors.IllegalParameterError
         if code == 598:
-            raise APIError(code, "Invalid command in packet. See logs.")
+            raise errors.IllegalCommandError
         if code == 555:
-            raise APIError(code, "BANNED. See ya.")
+            raise errors.BannedError(api_response.splitlines[1])
         if code == 502:
-            raise APIError(code, "Failed authenticating. Check credentials.")
+            raise errors.InvalidCredentialsError
         if code in (501, 506):
             logger.info("[%d] Invalid or expired session. Trying to login.",
                         code)
@@ -158,7 +146,7 @@ class API:
             logger.info("[%d] Server timeout. Delaying and resending.", code)
             sleep(5)
             return self.send(command, args, callback)
-        raise APIError(code, "Unhandled api response. This is not allowed.")
+        raise errors.UnhandledResponseError(api_response)
 
     @endpoint
     def auth(self,
@@ -184,7 +172,7 @@ class API:
         Raises:
             ValueError: Fired if max number of attempts to login was reached
                 Server keeps asking to retry, but fails to deliver a session.
-            APIError: Fired if client is outdated.
+            errors.APIError: Fired if client is outdated.
                 Either the client is outdated or this script is.
 
         Returns:
@@ -195,7 +183,8 @@ class API:
             }
         """
         if attempt > 5:
-            raise ValueError("Could not login after 5 attempts. Giving up.")
+            raise errors.EndpointError(
+                "Could not login after 5 attempts. Giving up.")
         data = {
             "user": settings.USERNAME if username is None else username,
             "pass": settings.PASSWORD if password is None else password,
@@ -210,17 +199,16 @@ class API:
             data["nat"] = nat
 
         def cb(code, response):
-            if code in (503, 504):
-                raise APIError(
-                    code,
-                    ("Client outdated. "
-                     "Update protover/client key or open a ticket.")
-                )
+            if code == 503:
+                raise errors.ClientOutdatedError
+            if code == 504:
+                reason = response.split('-')[1].strip()
+                raise errors.ClientBannedError(reason)
             if code in (200, 201):
                 parts = response.split(' ')
                 self.session = parts[1]
                 nat_info = parts[2] if nat == 1 else None
-            return dict(code=code, session=self.session, nat=nat_info)
+                return dict(session=self.session, nat=nat_info)
 
         return self.send("AUTH", data, cb)
 
@@ -233,13 +221,10 @@ class API:
                 code: int
             }
         """
-        def cb(code, _):
-            if code == 403:
-                logger.info("[%d] Not logged in", code)
-            if code == 203:
-                logger.info("[%d] Logged out", code)
-            self.session = ""
-            return dict(code=code)
+        def cb(code, response):
+            if code in (403, 203):
+                self.session = ""
+                return dict(message=response[3:].strip())
 
         return self.send("LOGOUT", {"s": self.session}, cb)
 
@@ -252,17 +237,16 @@ class API:
             name (str): Encoding name
 
         Raises:
-            APIError: Raised if encoding is not valid
+            errors.APIError: Raised if encoding is not valid
 
         Returns:
             {
                 code: int
             }
         """
-        def cb(code, _):
-            if code == 519:
-                raise APIError(code, f"Encoding [{name}] not supported")
-            return dict(code=code)
+        def cb(code, response):
+            if code in (519, 219):
+                return dict(message=response[3:].strip())
 
         return self.send("ENCODING", dict(name=name), cb)
 
@@ -283,9 +267,7 @@ class API:
         def cb(code, response):
             if code == 300:
                 port = int(response.split('\n')[1]) if nat else None
-            else:
-                port = None
-            return dict(code=code, port=port)
+                return dict(port=port)
 
         data = dict() if nat is None else dict(nat=nat)
         return self.send("PING", data, cb)
@@ -317,16 +299,10 @@ class API:
 
         def cb(code, response):
             if code == 330:
-                message = "Could not find anime with "
-                if aid is None:
-                    message += f"aname [{aname}]"
-                else:
-                    message += f"aid [{aid}]"
-                raise APIError(code, message)
+                return dict(message=response[3:].strip())
             if code == 230:
                 data = response.splitlines()[1]
                 result = alookup.parse_response(amask, data)
-                result["code"] = code
                 return result
 
         data = dict(s=self.session)
@@ -343,18 +319,15 @@ class API:
     @authenticated
     def animedesc(self, aid: int, part: int):
         def cb(code, response):
-            if code == 330:
-                raise APIError(code, f"aid [{aid}] not found")
-            if code == 333:
-                raise APIError(
-                    code, f"parts [{part}] for aid [{aid}] not found")
+            if code in (330, 330):
+                return dict(message=response[3:].strip())
             if code == 233:
                 parts = response.splitlines()[1].split('|')
                 return {
-                    'code': code,
                     'current_part': int(parts[0]),
                     'max_parts': int(parts[1]),
                     'description': parts[2]
                 }
+
         data = dict(aid=aid, part=part, s=self.session)
         return self.send("ANIMEDESC", data, cb)

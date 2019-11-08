@@ -1,4 +1,5 @@
-from lookup import int_list, str_list, to_bool
+from zenchi.lookup import int_list, str_list, to_bool
+
 # Byte 1
 AID = 1 << 7 << 48
 DATE_FLAGS = 1 << 6 << 48
