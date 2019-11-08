@@ -34,29 +34,6 @@ def endpoint(f):
     return wrapper
 
 
-def authenticated(f):
-    """Wraps an API endpoint that requires authentication.
-
-    If the user is not logged in, tries to login before calling the API.
-    Does nothing if the user is already logged in.
-
-    Args:
-        f (Callable): API endpoint that requires a session
-
-    Returns:
-        dict: Whatever f returns
-    """
-    @wraps(f)
-    def wrapper(self, *args, **kwargs):
-        if not self.session:
-            raise errors.EndpointError((
-                "This endpoint requires a session."
-                "Call .auth() to acquire one."))
-        return f(self, *args, **kwargs)
-
-    return wrapper
-
-
 class API:
     """TODO
 
@@ -80,7 +57,7 @@ class API:
              command: str,
              args: dict,
              callback: [[int, str], dict],
-             use_cache=True) -> dict:
+             requires_auth=False) -> dict:
         """Sends an UDP packet to endpoint and synchronously wait and reads a response.
 
         See https://wiki.anidb.net/w/UDP_API_Definition
@@ -95,37 +72,36 @@ class API:
                 the code and the raw response and returns the parsed response.
                 This callback in defined in each endpoint.
                 Do note that most errors are handled in the decorator endpoint.
-            use_cache (bool): Do not try to recover response from cache and
-                sends request to AniDB.
+            requires_auth (bool): Endpoint requires auth and session will be 
+                checked and appended to args if needed.
         Returns:
             dict: Whatever callback returns.
         """
+        if requires_auth:
+            if self.session:
+                args['s'] = self.session
+            else:
+                raise errors.EndpointError((
+                    "This endpoint requires a session. "
+                    "Call .auth() to acquire one."))
+
         message = '&'.join([f"{key}={value}" for key, value in args.items()])
         packet = f"{command} {message}"
         logger.info("Sending %s", packet)
 
-        if settings.USE_CACHE:
-            cached_response = cache.restore(command, message)
+        # cached_response = cache.restore(command, message)
+        if self.encrypted_session:
+            packet = crypto.encrypt(packet)
         else:
-            cached_response = None
+            packet = packet.encode(settings.ENCODING)
 
-        if cached_response is None:
-            if self.encrypted_session:
-                packet = crypto.encrypt(packet)
-            else:
-                packet = packet.encode(settings.ENCODING)
+        self.socket.send(packet)
+        raw_response = self.socket.recv(MAX_RECEIVE_SIZE)
 
-            self.socket.send(packet)
-            raw_response = self.socket.recv(MAX_RECEIVE_SIZE)
-
-            if self.encrypted_session:
-                api_response = crypto.decrypt(raw_response)
-            else:
-                api_response = raw_response.decode(settings.ENCODING)
+        if self.encrypted_session:
+            api_response = crypto.decrypt(raw_response)
         else:
-            logger.info("Found cached response. Last update: %s",
-                        cached_response['updated'].strftime('%x, %X'))
-            api_response = cached_response['response']
+            api_response = raw_response.decode(settings.ENCODING)
         logger.debug(api_response)
 
         code = int(api_response[:3])
@@ -144,7 +120,7 @@ class API:
         if code in (501, 506):
             logger.info("[%d] Invalid or expired session. Trying to login.",
                         code)
-            self.auth(use_cache=False)
+            self.auth()
             return self.send(command, args, callback)
         if code in (600, 601, 602):
             logger.info("[%d] Server unavailable. Delaying and resending.",
@@ -164,8 +140,7 @@ class API:
              client_name=None,
              client_version=None,
              nat=None,
-             attempt=1,
-             use_cache=True) -> dict:
+             attempt=1) -> dict:
         """Obtains new session.
             See https://wiki.anidb.net/w/UDP_API_Definition#AUTH:_Authing_to_the_AnimeDB # noqa
 
@@ -235,7 +210,7 @@ class API:
                 self.session = ""
                 return dict(message=response[3:].strip())
 
-        return self.send("LOGOUT", {"s": self.session}, cb)
+        return self.send("LOGOUT", {}, cb, True)
 
     @endpoint
     def encrypt(self, username=None, api_key=None, type=1):
@@ -303,7 +278,6 @@ class API:
         return self.send("PING", data, cb)
 
     @endpoint
-    @authenticated
     def anime(self, amask, aid=None, aname=None):
         """Retrieve anime data according to aid or aname.
 
@@ -326,38 +300,51 @@ class API:
         """
         if aid is None and aname is None:
             raise ValueError("Either aid or aname must be provided")
+        command = "ANIME"
+        identifier = dict(AID=aid)
 
         def cb(code, response):
             if code == 330:
                 return dict(message=response[3:].strip())
             if code == 230:
-                data = response.splitlines()[1]
-                result = alookup.parse_response(amask, data)
-                return result
+                content = response.splitlines()[1]
+                result = alookup.parse_response(amask, content)
+                return cache.update(command, identifier, result)
 
-        data = dict(s=self.session)
-        if aid is not None:
-            data['aid'] = aid
-        else:
+        data = {}
+        if aid is None:
             data['aname'] = aname
+            logger.warning(
+                ("Using aname to search for ANIME prevents cache from working"
+                 "Consider using aid instead."))
+        else:
+            data['aid'] = aid
 
-        if amask is not None:
-            data["amask"] = format(amask, 'x')
-        return self.send("ANIME", data, cb)
+        filtered_mask = alookup.filter_cached(amask, aid)
+        data["amask"] = format(filtered_mask, 'x')
+        if filtered_mask == 0:
+            return cache.restore(command, identifier)
+        return self.send(command, data, cb, True)
 
     @endpoint
-    @authenticated
     def animedesc(self, aid: int, part: int):
+        command = "ANIMEDESC"
+        data = dict(aid=aid, part=part)
+
         def cb(code, response):
             if code in (330, 330):
                 return dict(message=response[3:].strip())
             if code == 233:
                 parts = response.splitlines()[1].split('|')
-                return {
+                result = {
                     'current_part': int(parts[0]),
                     'max_parts': int(parts[1]),
                     'description': parts[2]
                 }
+                cache.update(command, data, result)
+                return result
 
-        data = dict(aid=aid, part=part, s=self.session)
-        return self.send("ANIMEDESC", data, cb)
+        entry = cache.restore(command, data)
+        if entry is None:
+            return self.send(command, data, cb, True)
+        return entry

@@ -32,7 +32,12 @@ def save(command, message, response):
                                  upsert=True)
 
 
-def restore(command, message):
+def restore(collection, filter):
     if this.db is None:
         return None
-    return this.db[command].find_one(dict(message=message))
+    return this.db[collection].find_one(filter, {'_id': 0})
+
+
+def update(collection, filter, data):
+    this.db[collection].update_one(filter, {'$set': data}, upsert=True)
+    return restore(collection, filter)

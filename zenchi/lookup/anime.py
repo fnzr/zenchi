@@ -1,4 +1,8 @@
+import logging
 from zenchi.lookup import int_list, str_list, to_bool
+import zenchi.cache as cache
+
+logger = logging.getLogger(__name__)
 
 # Byte 1
 AID = 1 << 7 << 48
@@ -120,5 +124,22 @@ def parse_response(input, response):
         if index != 0:
             text, function = lookup[index]
             result[text] = function(parts[part_index])
+            if part_index + len(parts) == 0:
+                break
             part_index -= 1
     return result
+
+
+def filter_cached(input, aid):
+    if aid is None:
+        return input
+    entry = cache.restore("ANIME", dict(AID=aid))
+    if entry is None:
+        return input
+    for i in range(56):
+        mask = input & (1 << i)
+        if mask != 0:
+            text, _ = lookup[mask]
+            if text in entry:
+                input &= ~mask
+    return input
