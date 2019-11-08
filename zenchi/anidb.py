@@ -19,6 +19,7 @@ ENCODING = 'UTF8'
 
 class APIError(Exception):
     """Generic error on communication with Anidb API."""
+
     def __init__(self, code, message):
         msg = f"AniDB returned code [{code}]. {message}"
         logger.error(msg)
@@ -26,7 +27,8 @@ class APIError(Exception):
 
 
 def endpoint(f):
-    """Decorator that wraps API endpoints in default behavior, particularly error code handling
+    """Decorator that wraps API endpoints in default behavior,
+    particularly error code handling
 
     Args:
         f (Callable): API endpoint function to be wrapped
@@ -49,7 +51,7 @@ def endpoint(f):
 def authenticated(f):
     """Wraps an API endpoint that requires authentication.
 
-    If the user is not logged in, tries to login before calling the API endpoint.
+    If the user is not logged in, tries to login before calling the API.
     Does nothing if the user is already logged in.
 
     Args:
@@ -77,6 +79,7 @@ class API:
     Returns:
         [type]: [description]
     """
+
     def __init__(self, in_port=8000, session='', skip_cache=True):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -101,11 +104,13 @@ class API:
             args (dict): Dicionary of arguments to be sent in the packet.
                 Will be sent as string according to ENCODING.
                 Ex: dict(foo=1, bar=2) => foo=1&bar=2
-            callback (Callable[[int, str], dict]): Each command has its own rules for
-                parsing the API response, so it receives the code and the raw response and
-                returns the parsed response. This callback in defined in each endpoint.
+            callback (Callable[[int, str], dict]): Each command has
+                its own rules for parsing the API response, so it receives
+                the code and the raw response and returns the parsed response.
+                This callback in defined in each endpoint.
                 Do note that most errors are handled in the decorator endpoint.
-            skip_cache (bool): Do not try to recover response from cache and sends request to AniDB.
+            skip_cache (bool): Do not try to recover response from cache and
+                sends request to AniDB.
         Returns:
             dict: Whatever callback returns.
         """
@@ -159,7 +164,7 @@ class API:
              attempt=1,
              skip_cache=True) -> dict:
         """Obtains new session.
-            See https://wiki.anidb.net/w/UDP_API_Definition#AUTH:_Authing_to_the_AnimeDB
+            See https://wiki.anidb.net/w/UDP_API_Definition#AUTH:_Authing_to_the_AnimeDB # noqa
 
         Args:
             username (str, optional): Defaults to $ANIDB_USERNAME.
@@ -167,7 +172,8 @@ class API:
             client_name (str, optional): Defaults to $ANIDB_CLIENTNAME.
             client_version (str, optional): Defaults to $ANIDB_CLIENTVERSION.
             nat (int, optional): Defaults to 0.
-            attempt (int, optional): Used to retry authentication and preventing server flood.
+            attempt (int, optional): Used to retry authentication and prevent
+                server flood.
 
         Raises:
             ValueError: Fired if max number of attempts to login was reached
@@ -207,7 +213,8 @@ class API:
             if code in (503, 504):
                 raise APIError(
                     code,
-                    "Client outdated. Update protover/client key or open a ticket."
+                    ("Client outdated. "
+                     "Update protover/client key or open a ticket.")
                 )
             if code in (200, 201):
                 parts = response.split(' ')
@@ -228,9 +235,9 @@ class API:
         """
         def cb(code, _):
             if code == 403:
-                logger.info(403, "Not logged in")
+                logger.info("[%d] Not logged in", code)
             if code == 203:
-                logger.info(203, "Logged out")
+                logger.info("[%d] Logged out", code)
             self.session = ""
             return dict(code=code)
 
@@ -239,7 +246,7 @@ class API:
     @endpoint
     def encoding(self, name, skip_cache=False):
         """Sets the encoding for the session. Used if session was restored.
-        See https://wiki.anidb.net/w/UDP_API_Definition#ENCODING:_Change_Encoding_for_Session
+        See https://wiki.anidb.net/w/UDP_API_Definition#ENCODING:_Change_Encoding_for_Session # noqa
 
         Args:
             name (str): Encoding name
@@ -261,7 +268,8 @@ class API:
 
     @endpoint
     def ping(self, nat=None, skip_cache=True):
-        """Pings the server. See https://wiki.anidb.net/w/UDP_API_Definition#PING:_Ping_Command
+        """Pings the server.
+        See https://wiki.anidb.net/w/UDP_API_Definition#PING:_Ping_Command
 
         Args:
             nat (int, optional): Any value here means true.
@@ -277,14 +285,14 @@ class API:
             return dict(code=code, port=port)
 
         data = dict() if nat is None else dict(nat=nat)
-        return self.send("PING", data, cb)
+        return self.send("PING", data, cb, skip_cache)
 
     @endpoint
     @authenticated
     def anime(self, amask, aid=None, aname=None, skip_cache=False):
         """Retrieve anime data according to aid or aname.
 
-        See https://wiki.anidb.net/w/UDP_API_Definition#ANIME:_Retrieve_Anime_Data
+        See https://wiki.anidb.net/w/UDP_API_Definition#ANIME:_Retrieve_Anime_Data # noqa
 
         Args:
             aid (int, optional)
@@ -298,7 +306,7 @@ class API:
             {
                 code: int
                 ...
-            }: Dynamic dictionary, built according to amask parameter. 
+            }: Dynamic dictionary, built according to amask parameter.
             See lookup.anime for all options.
         """
         if aid is None and aname is None:
@@ -319,4 +327,4 @@ class API:
 
         if amask is not None:
             data["amask"] = format(amask, 'x')
-        return self.send("ANIME", data, cb)
+        return self.send("ANIME", data, cb, skip_cache)

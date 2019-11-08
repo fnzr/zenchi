@@ -1,4 +1,4 @@
-#TODO: parse data types
+# TODO: parse data types
 
 # Byte 1
 AID = 1 << 7 << 48
@@ -110,8 +110,6 @@ lookup = {
     PARODY_COUNT: 'PARODY_COUNT'
 }
 
-#input = AID | YEAR | TYPE | ROMAJI_NAME | KANJI_NAME | ENGLISH_NAME | OTHER_NAME | EPISODES | HIGHEST_EPISODE_NUMBER | SPECIAL_EP_COUNT | RATING | VOTE_COUNT | TEMP_RATING | TEMP_VOTE | AVERATE_VIEW_RATING | REVIEW_COUNT
-
 
 def parse_response(input, response):
     result = dict()
@@ -123,8 +121,3 @@ def parse_response(input, response):
             result[lookup[index]] = parts[part_index]
             part_index -= 1
     return result
-
-
-#amask = AID | YEAR | ROMAJI_NAME | KANJI_NAME | ENGLISH_NAME
-#print(amask)
-#print()
