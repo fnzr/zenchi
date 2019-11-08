@@ -6,13 +6,13 @@ from functools import wraps
 from time import sleep
 from zenchi import cache, settings
 from zenchi.lookup import anime as alookup
+import zenchi.crypto as crypto
 import zenchi.errors as errors
 
 logger = logging.getLogger(__name__)
 
 MAX_RECEIVE_SIZE = 4096
 PROTOVER_PARAMETER = 3
-ENCODING = 'UTF8'
 
 
 def endpoint(f):
@@ -72,9 +72,10 @@ class API:
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(('', in_port))
         self.socket.connect(('api.anidb.net', 9000))
+        self.encrypted_session = False
         self.session = session
         if session:
-            self.encoding(ENCODING)
+            self.encoding(settings.ENCODING)
         cache.setup()
 
     def send(self,
@@ -111,8 +112,18 @@ class API:
             cached_response = None
 
         if cached_response is None:
-            self.socket.send(packet.encode(ENCODING))
-            api_response = self.socket.recv(MAX_RECEIVE_SIZE).decode(ENCODING)
+            if self.encrypted_session:
+                packet = crypto.encrypt(packet)
+            else:
+                packet = packet.encode(settings.ENCODING)
+
+            self.socket.send(packet)
+            raw_response = self.socket.recv(MAX_RECEIVE_SIZE)
+
+            if self.encrypted_session:
+                api_response = crypto.decrypt(raw_response)
+            else:
+                api_response = raw_response.decode(settings.ENCODING)
         else:
             logger.info("Found cached response. Last update: %s",
                         cached_response['updated'].strftime('%x, %X'))
@@ -193,7 +204,7 @@ class API:
             else client_name,
             "clientver": settings.CLIENT_VERSION if client_version is None
             else client_version,
-            "enc": ENCODING
+            "enc": settings.ENCODING
         }
         if nat is not None:
             data["nat"] = nat
@@ -227,6 +238,27 @@ class API:
                 return dict(message=response[3:].strip())
 
         return self.send("LOGOUT", {"s": self.session}, cb)
+
+    @endpoint
+    def encrypt(self, username=None, api_key=None, type=1):
+        api_key = settings.ENCRYPT_API_KEY if api_key is None else api_key
+        username = settings.USERNAME if username is None else username
+        if not api_key:
+            raise errors.EndpointError(
+                ("Requested ENCRYPT but no api_key provided. "
+                 "Set $ENCRYPT_API_KEY or pass as argument"))
+
+        def cb(code, response):
+            if code in (309, 509, 394):
+                return dict(message=response[3:].strip())
+            if code == 209:
+                salt = response.split(' ')[1].strip()
+                crypto.setup(api_key + salt)
+                self.encrypted_session = True
+                logger.info("Successfully registered encryption.")
+                return dict(salt=salt)
+
+        return self.send("ENCRYPT", dict(user=username, type=type), cb)
 
     @endpoint
     def encoding(self, name):
