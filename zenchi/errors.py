@@ -47,10 +47,16 @@ class ClientBannedError(APIError):
         )
 
 
+class InvalidSessionError(APIError):
+    def __init__(self) -> None:
+        super().__init__(
+            (
+                "506 INVALID SESSION."
+                "A session is being expected but was not sent. Is the client outdated?"
+            )
+        )
+
+
 class UnhandledResponseError(APIError):
     def __init__(self, data: str) -> None:
         super().__init__(f"The following response was not handled: {data}")
-
-
-class EndpointError(ValueError):
-    pass

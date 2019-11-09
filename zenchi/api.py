@@ -108,8 +108,8 @@ def send(
         if _session:
             args["s"] = _session
         else:
-            raise errors.EndpointError(
-                ("This endpoint requires a session. " "Call .auth() to acquire one.")
+            raise ValueError(
+                "Trying to send a command that requires a session without calling auth() first"
             )
     socket = get_socket()
     message = "&".join([f"{key}={value}" for key, value in args.items()])
@@ -143,10 +143,17 @@ def send(
         raise errors.BannedError(api_response.splitlines()[1])
     if code == 502:
         raise errors.InvalidCredentialsError
-    if code in (501, 506):
-        logger.info("[%d] Invalid or expired session. Trying to login.", code)
+    if code == 501:
+        logger.info("501 LOGIN FIRST. Sending auth and retrying.")
         auth()
         return send(command, args, callback)
+    if code == 506:
+        if "s" in args:
+            logger.info("506 INVALID SESSION. Sending auth and retying")
+            auth()
+            return send(command, args, callback)
+        else:
+            raise errors.InvalidSessionError
     if code in (600, 601, 602):
         logger.info("[%d] Server unavailable. Delaying and resending.", code)
         sleep(30)
@@ -164,7 +171,6 @@ def auth(
     client_name: str = "",
     client_version: str = "",
     nat: bool = False,
-    attempt: int = 1,
 ) -> EndpointResult:
     """Obtain new session.
 
@@ -192,8 +198,6 @@ def auth(
             nat: str or None
         }
     """
-    if attempt > 5:
-        raise errors.EndpointError("Could not login after 5 attempts. Giving up.")
     data = {
         "user": value_or_error("ANIDB_USERNAME", username),
         "pass": value_or_error("ANIDB_PASSWORD", password),
@@ -333,7 +337,7 @@ def anime(
         See lookup.anime for all options.
     """
     if aid is None and aname is None:
-        raise errors.EndpointError("Either aid or aname must be provided")
+        raise ValueError("Either aid or aname must be provided")
     command = "ANIME"
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
