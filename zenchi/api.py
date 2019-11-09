@@ -15,8 +15,10 @@ logger = logging.getLogger(__name__)
 MAX_RECEIVE_SIZE = 4096
 PROTOVER_PARAMETER = 3
 
+
 EndpointDict = Dict[str, Any]
 EndpointResult = Tuple[EndpointDict, int]
+PacketParameters = Dict[str, Union[str, int]]
 
 
 def endpoint(f: Callable[..., EndpointResult]) -> Callable[..., EndpointResult]:
@@ -55,7 +57,7 @@ class API:
     def send(
         self,
         command: str,
-        args: Dict[str, Union[str, int]],
+        args: PacketParameters,
         callback: Callable[[int, str], Optional[EndpointDict]],
         requires_auth: bool = False,
     ) -> EndpointResult:
@@ -291,9 +293,8 @@ class API:
                 return dict(port=port)
             return None
 
-        data = {} if nat is None else dict(nat=nat)
-        # I don't know what mypy cries about here
-        return self.send("PING", data, cb)  # type: ignore
+        data: PacketParameters = {} if nat is None else dict(nat=nat)
+        return self.send("PING", data, cb)
 
     @endpoint
     def anime(
@@ -319,7 +320,7 @@ class API:
             See lookup.anime for all options.
         """
         if aid is None and aname is None:
-            raise ValueError("Either aid or aname must be provided")
+            raise errors.EndpointError("Either aid or aname must be provided")
         command = "ANIME"
 
         def cb(code: int, response: str) -> Optional[EndpointDict]:
@@ -335,23 +336,22 @@ class API:
             return None
 
         filtered_mask = alookup.filter_cached(amask, aid)
-        if filtered_mask == 0:
-            restored = cache.restore(command, aid)  # type: ignore
-            if restored is not None:
-                return restored, 230
-
-        data = dict(amask=format(filtered_mask, "x"))
-        if aid is None:
-            data["aname"] = aname  # type: ignore
+        data: PacketParameters = dict(amask=format(filtered_mask, "x"))
+        if aid is not None:
+            if filtered_mask == 0:
+                restored = cache.restore(command, aid)
+                if restored is not None:
+                    return restored, 230
+            data["aid"] = aid
+        elif aname is not None:
+            data["aname"] = aname
             logger.warning(
                 (
                     "Using aname to search for ANIME prevents cache from working"
                     "Consider using aid instead."
                 )
             )
-        else:
-            data["aid"] = aid  # type: ignore
-        return self.send(command, data, cb, True)  # type: ignore
+        return self.send(command, data, cb, True)
 
     @endpoint
     def animedesc(self, aid: int, part: int) -> EndpointResult:
@@ -374,6 +374,6 @@ class API:
 
         entry = cache.restore(command, id)
         if entry is None:
-            data = dict(aid=aid, part=part)
-            return self.send(command, data, cb, True)  # type: ignore
+            data: PacketParameters = dict(aid=aid, part=part)
+            return self.send(command, data, cb, True)
         return entry, 233

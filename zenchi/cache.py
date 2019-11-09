@@ -5,7 +5,6 @@ import pymongo
 import logging
 from datetime import datetime
 
-this = sys.modules[__name__]
 db: Any = None
 MAX_SERVER_DELAY = 5000
 
