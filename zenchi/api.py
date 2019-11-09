@@ -7,6 +7,7 @@ from functools import wraps
 from time import sleep
 from zenchi import cache, settings
 from zenchi.lookup import anime as alookup
+from zenchi.lookup import int_list
 import zenchi.crypto as crypto
 import zenchi.errors as errors
 
@@ -377,3 +378,44 @@ class API:
             data: PacketParameters = dict(aid=aid, part=part)
             return self.send(command, data, cb, True)
         return entry, 233
+
+    @endpoint
+    def character(self, charid: int) -> EndpointResult:
+        command = "CHARACTER"
+
+        def cb(code: int, response: str) -> Optional[EndpointDict]:
+            if code == 335:
+                return dict(message=response[3:].strip())
+            if code == 235:
+                data = response.splitlines()[1].split("|")
+                result = {
+                    "charid": int(data[0]),
+                    "name_kanji": data[1],
+                    "name_transcription": data[2],
+                    "pic": data[3],
+                    "episode_list": int_list(data[5]),
+                    "last_updated_date": int(data[6]),
+                    "type": int(data[7]),
+                    "gender": data[8],
+                }
+                blocks = []
+                raw_blocks = data[4].split("'")
+                for block in raw_blocks:
+                    parts = block.split(",")
+                    blocks.append(
+                        {
+                            "anime_id": int(parts[0]),
+                            "appearance": int(parts[1]),
+                            "creator_id": int(parts[2]),
+                            "is_main_seyuu": bool(parts[3]) if parts[3] else None,
+                        }
+                    )
+                result["anime_blocks"] = blocks
+                return cache.update(command, charid, result)
+            return None
+
+        entry = cache.restore(command, charid)
+        if entry is None:
+            return self.send(command, dict(charid=charid), cb, True)
+        return entry, 235
+

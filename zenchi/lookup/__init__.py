@@ -6,7 +6,10 @@ def str_list(data: str) -> List[str]:
 
 
 def int_list(data: str) -> List[int]:
-    return list(map(lambda x: int(x), str_list(data)))
+    listed = str_list(data)
+    if listed[0]:
+        return list(map(lambda x: int(x), listed))
+    return []
 
 
 def to_bool(data: str) -> bool:
