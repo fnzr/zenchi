@@ -16,5 +16,3 @@ USE_CACHE = env.bool("USE_CACHE", True)
 ENCRYPT_API_KEY = env.str("ENCRYPT_API_KEY", "")
 
 ENCODING = env.str("ANIDB_ENCODING", "UTF8")
-
-DRY_RUN = env.bool("DRY_RUN", False)
