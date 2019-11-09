@@ -1,6 +1,5 @@
-"""Placeholder
-"""
-from typing import Callable, Any, Dict, Tuple, Union, Optional, cast, Iterator
+"""Placeholder."""
+from typing import Callable, List, Any, Dict, Tuple, Union, Optional, cast, Iterator
 import socket
 import logging
 import threading
@@ -25,6 +24,15 @@ PacketParameters = Dict[str, Union[str, int]]
 _conn: Optional[socket.socket] = None
 _encrypted_session = False
 _session = ""
+
+
+def value_or_error(env_name: str, value: str) -> str:
+    if value:
+        return value
+    env_value = settings.__dict__[env_name]
+    if env_value:
+        return str(env_value)
+    raise ValueError(f"{env_name} is required but is not in env nor was a parameter")
 
 
 def _listen_incoming_packets() -> Iterator[bytes]:
@@ -60,7 +68,7 @@ def send(
     callback: Callable[[int, str], Optional[EndpointDict]],
     requires_auth: bool = False,
 ) -> EndpointResult:
-    """Sends an UDP packet to endpoint and synchronously wait and reads a response.
+    """Send an UDP packet to endpoint and synchronously wait and reads a response.
 
     See https://wiki.anidb.net/w/UDP_API_Definition
 
@@ -76,8 +84,10 @@ def send(
             Do note that most errors are handled in the decorator endpoint.
         requires_auth (bool): Endpoint requires auth and session will be 
             checked and appended to args if needed.
+
     Returns:
         dict: Whatever callback returns.
+
     """
     if requires_auth:
         if _session:
@@ -95,14 +105,14 @@ def send(
     if _encrypted_session:
         packet = crypto.encrypt(data)
     else:
-        packet = data.encode(settings.ENCODING)
+        packet = data.encode(settings.ANIDB_API_ENCODING)
     socket.send(packet)
     raw_response = next(_listen_incoming_packets())
 
     if _encrypted_session:
         api_response = crypto.decrypt(raw_response)
     else:
-        api_response = raw_response.decode(settings.ENCODING)
+        api_response = raw_response.decode(settings.ANIDB_API_ENCODING)
     logger.debug(api_response)
 
     code = int(api_response[:3])
@@ -134,14 +144,15 @@ def send(
 
 
 def auth(
-    username: Optional[str] = None,
-    password: Optional[str] = None,
-    client_name: Optional[str] = None,
-    client_version: Optional[str] = None,
-    nat: Optional[int] = None,
+    username: str = "",
+    password: str = "",
+    client_name: str = "",
+    client_version: str = "",
+    nat: bool = False,
     attempt: int = 1,
 ) -> EndpointResult:
-    """Obtains new session.
+    """Obtain new session.
+
         See https://wiki.anidb.net/w/UDP_API_Definition#AUTH:_Authing_to_the_AnimeDB # noqa
 
     Args:
@@ -169,16 +180,15 @@ def auth(
     if attempt > 5:
         raise errors.EndpointError("Could not login after 5 attempts. Giving up.")
     data = {
-        "user": settings.USERNAME if username is None else username,
-        "pass": settings.PASSWORD if password is None else password,
+        "user": value_or_error("ANIDB_USERNAME", username),
+        "pass": value_or_error("ANIDB_PASSWORD", password),
+        "client": value_or_error("ZENCHI_CLIENTNAME", client_name),
+        "clientver": value_or_error("ZENCHI_CLIENTVERSION", client_version),
         "protover": PROTOVER_PARAMETER,
-        "client": settings.CLIENT_NAME if client_name is None else client_name,
-        "clientver": settings.CLIENT_VERSION
-        if client_version is None
-        else client_version,
-        "enc": settings.ENCODING,
+        "enc": settings.ANIDB_API_ENCODING,
     }
-    if nat is not None:
+
+    if nat:
         data["nat"] = nat
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
@@ -217,18 +227,9 @@ def logout() -> EndpointResult:
     return send("LOGOUT", {}, cb, True)
 
 
-def encrypt(
-    username: Optional[str] = None, api_key: Optional[str] = None, type: int = 1,
-) -> EndpointResult:
-    api_key = settings.ENCRYPT_API_KEY if api_key is None else api_key
-    username = settings.USERNAME if username is None else username
-    if api_key is None or not api_key:
-        raise errors.EndpointError(
-            (
-                "Requested ENCRYPT but no api_key provided. "
-                "Set $ENCRYPT_API_KEY or pass as argument"
-            )
-        )
+def encrypt(username: str = "", api_key: str = "", type: int = 1) -> EndpointResult:
+    api_key = value_or_error("ENCRYPT_API_KEY", api_key)
+    username = value_or_error("ANIDB_USERNAME", username)
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code in (309, 509, 394):
@@ -247,6 +248,7 @@ def encrypt(
 
 def encoding(name: str) -> EndpointResult:
     """Sets the encoding for the session. Used if session was restored.
+
     See https://wiki.anidb.net/w/UDP_API_Definition#ENCODING:_Change_Encoding_for_Session # noqa
 
     Args:

@@ -29,12 +29,12 @@ def setup(key: str) -> None:
 def encrypt(message: str) -> bytes:
     global aes
     message = pad(message)
-    bytes_message = bytes(message, settings.ENCODING)
+    bytes_message = bytes(message, settings.ANIDB_API_ENCODING)
     return aes.encrypt(bytes_message)  # type: ignore
 
 
 def decrypt(message: bytes) -> str:
     global aes
     plain_bytes = aes.decrypt(message)
-    padded_plain = plain_bytes.decode(settings.ENCODING)
+    padded_plain = plain_bytes.decode(settings.ANIDB_API_ENCODING)
     return unpad(padded_plain)
