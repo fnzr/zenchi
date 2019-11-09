@@ -1,5 +1,15 @@
 """Placeholder."""
-from typing import Callable, List, Any, Dict, Tuple, Union, Optional, cast, Iterator
+from typing import (
+    Callable,
+    List,
+    Any,
+    Dict,
+    Tuple,
+    Union,
+    Optional,
+    Iterator,
+    TypeVar,
+)
 import socket
 import logging
 import threading
@@ -17,6 +27,7 @@ MAX_RECEIVE_SIZE = 4096
 PROTOVER_PARAMETER = 3
 
 
+T = TypeVar("T")
 EndpointDict = Dict[str, Any]
 EndpointResult = Tuple[EndpointDict, int]
 PacketParameters = Dict[str, Union[str, int]]
@@ -25,13 +36,15 @@ _conn: Optional[socket.socket] = None
 _encrypted_session = False
 _session = ""
 
+PUBLIC_COMMANDS = ["PING", "ENCRYPT", "ENCODING", "AUTH", "VERSION"]
 
-def value_or_error(env_name: str, value: str) -> str:
+
+def value_or_error(env_name: str, value: T) -> T:
     if value:
         return value
     env_value = settings.__dict__[env_name]
     if env_value:
-        return str(env_value)
+        return env_value  # type: ignore
     raise ValueError(f"{env_name} is required but is not in env nor was a parameter")
 
 
@@ -42,16 +55,19 @@ def _listen_incoming_packets() -> Iterator[bytes]:
     return b""
 
 
-def create_socket(host: str = "", port: int = 14443) -> socket.socket:
+def create_socket(
+    host: str = "", port: int = 14443, anidb_server: str = "", anidb_port: int = 0
+) -> socket.socket:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((host, port))
-    anidb_host = settings.ANIDB_SERVER
-    anidb_port = settings.ANIDB_PORT
-    s.connect((anidb_host, anidb_port))
+    anidb_server = value_or_error("ANIDB_SERVER", anidb_server)
+    anidb_port = value_or_error("ANIDB_PORT", anidb_port)
+    s.connect((anidb_server, anidb_port))
     logger.info(
-        f"Created socket on UDP %s:%d => %s:%d", host, port, anidb_host, anidb_port
+        f"Created socket on UDP %s:%d => %s:%d", host, port, anidb_server, anidb_port
     )
+    cache.setup()
     return s
 
 
@@ -66,7 +82,6 @@ def send(
     command: str,
     args: PacketParameters,
     callback: Callable[[int, str], Optional[EndpointDict]],
-    requires_auth: bool = False,
 ) -> EndpointResult:
     """Send an UDP packet to endpoint and synchronously wait and reads a response.
 
@@ -89,7 +104,7 @@ def send(
         dict: Whatever callback returns.
 
     """
-    if requires_auth:
+    if command not in PUBLIC_COMMANDS:
         if _session:
             args["s"] = _session
         else:
@@ -224,7 +239,7 @@ def logout() -> EndpointResult:
             return dict(message=response[3:].strip())
         return None
 
-    return send("LOGOUT", {}, cb, True)
+    return send("LOGOUT", {}, cb)
 
 
 def encrypt(username: str = "", api_key: str = "", type: int = 1) -> EndpointResult:
@@ -349,7 +364,7 @@ def anime(
                 "Consider using aid instead."
             )
         )
-    return send(command, data, cb, True)
+    return send(command, data, cb)
 
 
 def animedesc(aid: int, part: int) -> EndpointResult:
@@ -373,7 +388,7 @@ def animedesc(aid: int, part: int) -> EndpointResult:
     entry = cache.restore(command, id)
     if entry is None:
         data: PacketParameters = dict(aid=aid, part=part)
-        return send(command, data, cb, True)
+        return send(command, data, cb)
     return entry, 233
 
 
@@ -413,6 +428,6 @@ def character(charid: int) -> EndpointResult:
 
     entry = cache.restore(command, charid)
     if entry is None:
-        return send(command, dict(charid=charid), cb, True)
+        return send(command, dict(charid=charid), cb)
     return entry, 235
 
