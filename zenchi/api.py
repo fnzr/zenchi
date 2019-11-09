@@ -535,3 +535,40 @@ def character(charid: int) -> EndpointResult:
         return send(command, dict(charid=charid), cb)
     return entry, 235
 
+
+def calendar() -> EndpointResult:
+    """Retrieve recently aired and upcoming shows.
+
+    See https://wiki.anidb.net/w/UDP_API_Definition#CALENDAR:_Get_Upcoming_Titles
+    
+    :return: A tuple (data, code). data is a dictionary with the keys:
+        if code == 397:
+            :message str: CALENDAR EMPTY
+        if code == 297:
+            :calendar List[Dictionary]:
+        Each calendar entry has the following keys:
+            :aid int:
+            :startdate int:
+            :dateflags int:
+    :rtype: EndpointResult
+    """
+
+    def cb(code: int, response: str) -> Optional[EndpointDict]:
+        if code == 397:
+            return dict(message=response[3:].strip())
+        if code == 297:
+            lines = response.splitlines()[1:]
+            result = []
+            for line in lines:
+                parts = line.split("|")
+                result.append(
+                    {
+                        "aid": int(parts[0]),
+                        "startdate": int(parts[1]),
+                        "dateflags": int(parts[2]),
+                    }
+                )
+            return dict(calendar=result)
+        return None
+
+    return send("CALENDAR", {}, cb)
