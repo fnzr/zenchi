@@ -1,3 +1,7 @@
+"""Bytes mapping for masks.
+
+Used in https://wiki.anidb.net/w/UDP_API_Definition#ANIME:_Retrieve_Anime_Data
+"""
 from typing import Tuple, Dict, Callable, Any, Optional
 import logging
 from zenchi.mappings import int_list, str_list, to_bool
@@ -111,6 +115,15 @@ lookup: Dict[int, Tuple[str, Callable[[str], Any]]] = {
 
 
 def parse_response(input: int, response: str) -> Dict[str, Any]:
+    """Parse API response to ANIME command into a dictionary.
+    
+    :param input: mask used to send the command
+    :type input: int
+    :param response: string sent as response to the command
+    :type response: str
+    :return: A variable key dictionary matching what was requested in the mask.
+    :rtype: Dict[str, Any]
+    """
     result = dict()
     parts = response.split("|")
     part_index = -1
@@ -126,6 +139,15 @@ def parse_response(input: int, response: str) -> Dict[str, Any]:
 
 
 def filter_cached(input: int, aid: Optional[int]) -> int:
+    """Filter out cached values for ANIME, lessening server load.
+    
+    :param input: original requested mask
+    :type input: int
+    :param aid: anime id
+    :type aid: Optional[int]
+    :return: new mask with less or igual value.
+    :rtype: int
+    """
     if aid is None:
         return input
     entry = cache.restore("anime", aid)

@@ -1,3 +1,6 @@
+"""Undesireables."""
+
+
 class APIError(ValueError):
     pass
 

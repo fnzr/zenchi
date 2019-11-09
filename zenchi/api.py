@@ -40,6 +40,16 @@ PUBLIC_COMMANDS = ["PING", "ENCRYPT", "ENCODING", "AUTH", "VERSION"]
 
 
 def value_or_error(env_name: str, value: T) -> T:
+    """Shorthand method to check is a variable has appropriate value.
+    
+    :param env_name: name of environment variable to default to if value is not set.
+    :type env_name: str
+    :param value: the provided value of the variable.
+    :type value: T
+    :raises ValueError: raised if neither value not Environment Variable is set.
+    :return: the value to be used by the variable in the proper context.
+    :rtype: T
+    """
     if value:
         return value
     env_value = settings.__dict__[env_name]
@@ -49,6 +59,13 @@ def value_or_error(env_name: str, value: T) -> T:
 
 
 def _listen_incoming_packets() -> Iterator[bytes]:
+    """Wait until received a packet from the server.
+
+    TODO: this hangs indefinetely if no data is received.
+    
+    :return: The raw data from the server.
+    :rtype: Iterator[bytes]
+    """
     s = get_socket()
     while True:
         yield s.recv(MAX_RECEIVE_SIZE)
@@ -58,6 +75,21 @@ def _listen_incoming_packets() -> Iterator[bytes]:
 def create_socket(
     host: str = "", port: int = 14443, anidb_server: str = "", anidb_port: int = 0
 ) -> socket.socket:
+    """Create a socket to be use to communicate with the server.
+
+    This function is called internally, so you only have to call it if you want to change the default parameters.
+
+    :param host: local host to bind the socket to, defaults to "" (which I think is any. Read the docs.)
+    :type host: str, optional
+    :param port: local port to bind the socket to, defaults to 14443
+    :type port: int, optional
+    :param anidb_server: aniDB server name, defaults to environment ANIDB_SERVER
+    :type anidb_server: str, optional
+    :param anidb_port: anidb port, default to environment ANIDB_PORT
+    :type anidb_port: int, optional
+    :return: The created socket.
+    :rtype: socket.socket
+    """
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((host, port))
@@ -68,10 +100,17 @@ def create_socket(
         f"Created socket on UDP %s:%d => %s:%d", host, port, anidb_server, anidb_port
     )
     cache.setup()
+    global _conn
+    _conn = s
     return s
 
 
 def get_socket() -> socket.socket:
+    """Create socket if doesn't exist. Returns it.
+    
+    :return: Socket used for all communication with the server.
+    :rtype: socket.socket
+    """
     global _conn
     if _conn is None:
         _conn = create_socket()
@@ -87,22 +126,19 @@ def send(
 
     See https://wiki.anidb.net/w/UDP_API_Definition
 
-    Args:
-        command (str): API command. Ex: PING
-        args (dict): Dicionary of arguments to be sent in the packet.
-            Will be sent as string according to ENCODING.
-            Ex: dict(foo=1, bar=2) => foo=1&bar=2
-        callback (Callable[[int, str], dict]): Each command has
-            its own rules for parsing the API response, so it receives
-            the code and the raw response and returns the parsed response.
-            This callback in defined in each endpoint.
-            Do note that most errors are handled in the decorator endpoint.
-        requires_auth (bool): Endpoint requires auth and session will be 
-            checked and appended to args if needed.
-
-    Returns:
-        dict: Whatever callback returns.
-
+    :param command: the first word to be sent to the server
+    :type command: str
+    :param args: a dictionary o parameters that will be sent to the server, name=value
+    :type args: PacketParameters
+    :param callback: the response handler.
+    :type callback: Callable[[int, str], Optional[EndpointDict]]
+    :raises ValueError: [description]
+    :raises errors.APIError: this actually raises specific Errors according to response code.
+        If this was raised, the server rejected the request for some reason.    
+    :raises ValueError: raised if there was an attempt to send a request to a restricted endpoint without authenticating first.
+    Call auth() and repeat the request.
+    :return: a tuple (data, code). See docs of specific commands for details.
+    :rtype: EndpointResult
     """
     if command not in PUBLIC_COMMANDS:
         if _session:
@@ -172,31 +208,28 @@ def auth(
     client_version: str = "",
     nat: bool = False,
 ) -> EndpointResult:
-    """Obtain new session.
+    """Create a new session for authentication.
 
-        See https://wiki.anidb.net/w/UDP_API_Definition#AUTH:_Authing_to_the_AnimeDB # noqa
+    See https://wiki.anidb.net/w/UDP_API_Definition#AUTH:_Authing_to_the_AnimeDB
 
-    Args:
-        username (str, optional): Defaults to $ANIDB_USERNAME.
-        password (str, optional): Defaults to $ANIDB_PASSWORD.
-        client_name (str, optional): Defaults to $ANIDB_CLIENTNAME.
-        client_version (str, optional): Defaults to $ANIDB_CLIENTVERSION.
-        nat (int, optional): Defaults to 0.
-        attempt (int, optional): Used to retry authentication and prevent
-            server flood.
-
-    Raises:
-        ValueError: Fired if max number of attempts to login was reached
-            Server keeps asking to retry, but fails to deliver a session.
-        errors.APIError: Fired if client is outdated.
-            Either the client is outdated or this script is.
-
-    Returns:
-        {
-            code: int,
-            session: str,
-            nat: str or None
-        }
+    :param username: anidb user. Defaults to environment ANIDB_USERNAME
+    :type username: str, optional
+    :param password: anidb password. Defaults to environment ANIDB_USERNAME
+    :type password: str, optional
+    :param client_name: zenchi client name. Defaults to environment ZENCHI_CLIENTNAME
+    :type client_name: str, optional
+    :param client_version: zenchi client version. Defaults to environment ZENCHI_CLIENTVERSION
+    :type client_version: str, optional
+    :param nat: should request nat info, defaults to False
+    :type nat: bool, optional
+    :raises errors.ClientOutdatedError:
+    :raises errors.ClientBannedError:
+    :raises ValueError: raised if any of the parameters is not set
+    :return: A tuple (data, code). data is a dictionary with the keys:
+        :session str: The session provided by the server. Will be used in all future commands
+            that require authentication.
+        :nat Optional[str]: Present only if nat=1. String `ip:port`.
+    :rtype: EndpointResult
     """
     data = {
         "user": value_or_error("ANIDB_USERNAME", username),
@@ -220,20 +253,23 @@ def auth(
             parts = response.split(" ")
             global _session
             _session = parts[1]
-            nat_info = parts[2] if nat == 1 else None
-            return dict(session=_session, nat=nat_info)
+            result = dict(session=_session)
+            if nat:
+                result["nat"] = parts[2]
+            return result
         return None
 
     return send("AUTH", data, cb)
 
 
 def logout() -> EndpointResult:
-    """Logout. See https://wiki.anidb.net/w/UDP_API_Definition#LOGOUT:_Logout
+    """Clear the session and invalidates it to the server.
 
-    Returns:
-        {
-            code: int
-        }
+    See https://wiki.anidb.net/w/UDP_API_Definition#LOGOUT:_Logout
+    
+    :return: A tuple (data, code). data is a dictionary with the keys:
+        :message str: the returned message from the server.
+    :rtype: EndpointResult
     """
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
@@ -247,6 +283,23 @@ def logout() -> EndpointResult:
 
 
 def encrypt(username: str = "", api_key: str = "", type: int = 1) -> EndpointResult:
+    """Enable encrypted communication with the server until new connection or logout.
+
+    See https://wiki.anidb.net/w/UDP_API_Definition#ENCRYPT:_Start_Encrypted_Session
+    
+    :param username: anidb user. Defaults to environment ANIDB_USERNAME
+    :type username: str, optional
+    :param api_key: anidb user. Defaults to environment ANIDB_ENCRYPT_API_KEY
+    :type api_key: str, optional
+    :param type: required for command. Do not modify. Defaults to 1
+    :type type: int, optional
+    :return: A tuple (data, code). 
+        If the command is successful, data is a dictionary with the keys:
+            :salt str: salt to be used with api_key to encrypt and decrypt future messages.
+        If not:
+            :message str: the reason why the command failed.
+    :rtype: EndpointResult
+    """
     api_key = value_or_error("ENCRYPT_API_KEY", api_key)
     username = value_or_error("ANIDB_USERNAME", username)
 
@@ -266,20 +319,17 @@ def encrypt(username: str = "", api_key: str = "", type: int = 1) -> EndpointRes
 
 
 def encoding(name: str) -> EndpointResult:
-    """Sets the encoding for the session. Used if session was restored.
+    """Set the encoding for the session. Should be used only when restoring existing session.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#ENCODING:_Change_Encoding_for_Session # noqa
 
-    Args:
-        name (str): Encoding name
-
-    Raises:
-        errors.APIError: Raised if encoding is not valid
-
-    Returns:
-        {
-            code: int
-        }
+    TODO: is it even possible to "restore" a session?
+    
+    :param name: encoding name
+    :type name: str
+    :return: A tuple (data, code). data is a dictionary with the keys:
+        :message str: the server response.
+    :rtype: EndpointResult
     """
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
@@ -290,51 +340,57 @@ def encoding(name: str) -> EndpointResult:
     return send("ENCODING", dict(name=name), cb)
 
 
-def ping(nat: Optional[int] = None) -> EndpointResult:
-    """Pings the server.
+def ping(nat: bool = False) -> EndpointResult:
+    """Ping the server.
+
     See https://wiki.anidb.net/w/UDP_API_Definition#PING:_Ping_Command
-
-    Args:
-        nat (int, optional): Any value here means true.
-
-    Returns:
-        {
-            code: int,
-            port: int | None
-        }: Server response.
+    
+    :param nat: determine if server should inform the outgoing port. Defaults to False.
+    :type nat: bool
+    :return: A tuple (data, code). data is a dictionary with the key:
+        if nat:
+            :port int: the outgoing port as seen by the server.
+        otherwise, empty.
+    :rtype: EndpointResult
     """
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code == 300:
-            port = int(response.split("\n")[1]) if nat else None
-            return dict(port=port)
+            if nat:
+                return dict(port=int(response.split("\n")[1]))
+            else:
+                return {}
         return None
 
-    data: PacketParameters = {} if nat is None else dict(nat=nat)
+    data: PacketParameters = {} if nat else dict(nat=1)
     return send("PING", data, cb)
 
 
 def anime(
     amask: int, aid: Optional[int] = None, aname: Optional[str] = None
 ) -> EndpointResult:
-    """Retrieve anime data according to aid or aname.
+    """Retrieve anime data according to mask.
 
-    See https://wiki.anidb.net/w/UDP_API_Definition#ANIME:_Retrieve_Anime_Data # noqa
+    See https://wiki.anidb.net/w/UDP_API_Definition#ANIME:_Retrieve_Anime_Data
 
-    Args:
-        aid (int, optional)
-        aname (str, optional)
-        amask (int, optional): 56bit integer
-
-    Raises:
-        ValueError: Raised if neither aid and aname are provided.
-
-    Returns:
-        {
-            code: int
-            ...
-        }: Dynamic dictionary, built according to amask parameter.
-        See lookup.anime for all options.
+    :param amask: an encoded int the defines what will be requested from the server.
+        Preferably created by using mappings.anime module. For example:
+            amask = aid | episodes | year | english_name | rating
+        Before sending the parameter to the server, this value is filtered against the local cache,
+        preventing the request of repeated data.
+        This means the provided mask and the sent mask will not necessarily match.
+    :type amask: int
+    :param aid: anidb id of anime. Defaults to None
+    :type aid: Optional[int]
+    :param aname: search by anime name, must match perfectly. Avoid using this. Defaults to None.
+    :type aname: Optional[str]
+    :raises ValueError: raised if neither aid and aname are provided.
+    :return: A tuple (data, code). data is a dictionary with the keys:
+        if no anime was found:
+            :message str: "NO SUCH ANIME"
+        if anime was found, a dictionary with the keys matching the requested data.
+        TODO: currently, if some anime data is in the cache, ALL anime data is returned.
+    :rtype: EndpointResult
     """
     if aid is None and aname is None:
         raise ValueError("Either aid or aname must be provided")
@@ -372,6 +428,23 @@ def anime(
 
 
 def animedesc(aid: int, part: int) -> EndpointResult:
+    """Retrieve partial anime description.
+
+    See https://wiki.anidb.net/w/UDP_API_Definition#ANIMEDESC:_Retrieve_Anime_Description
+    
+    :param aid: anidb id of anime.
+    :type aid: int
+    :param part: part of the description. One description might span several parts.
+    :type part: int
+    :return: A tuple (data, code). data is a dictionary with the keys:
+        if successful:
+            :current_part int: the requested part
+            :max_parts int: the number of parts of this description.
+            :description str: the description.
+        if not:
+            :message str: reason.
+    :rtype: EndpointResult
+    """
     command = "ANIMEDESC"
     id = f"{aid}|{part}"
 
@@ -397,6 +470,33 @@ def animedesc(aid: int, part: int) -> EndpointResult:
 
 
 def character(charid: int) -> EndpointResult:
+    """Retrieve character details.
+
+    See https://wiki.anidb.net/w/UDP_API_Definition#CHARACTER:_Get_Character_Information
+    
+    :param charid: anidb id of the character.
+    :type charid: int
+    :return: A tuple (data, code). data is a dictionary with the keys:
+        if code == 335:
+            :message str: NO SUCH CHARACTER
+        if code == 235:
+            For details, see link above.
+            :charid int:
+            :name_kanki str:
+            :name_transcription str:
+            :pic:
+            :episode_list List[int]:
+            :last_updated_date int:
+            :type int:
+            :gender str:
+            :anime_blocks List[Dictionary]:
+        Each anime block has the following keys:
+            :anime_id int:
+            :appearance int:
+            :creator_id int:
+            :is_main_seyuu bool or None:
+    :rtype: EndpointResult
+    """
     command = "CHARACTER"
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:

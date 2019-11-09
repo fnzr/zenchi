@@ -1,3 +1,4 @@
+"""Settings dump."""
 from environs import Env
 
 env = Env()
@@ -11,7 +12,7 @@ ANIDB_PASSWORD = env.str("ANIDB_PASSWORD")
 
 ANIDB_API_ENCODING = env.str("ANIDB_API_ENCODING", "UTF8")
 
-ANIDB_ENCRYPT_API_KEY = env.str("ENCRYPT_API_KEY", "")
+ANIDB_ENCRYPT_API_KEY = env.str("ANIDB_ENCRYPT_API_KEY", "")
 
 ZENCHI_CLIENTNAME = env.str("ZENCHI_CLIENTNAME")
 ZENCHI_CLIENTVERSION = env.str("ZENCHI_CLIENTVERSION")
