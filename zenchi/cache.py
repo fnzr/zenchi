@@ -1,43 +1,38 @@
 """Placeholder"""
+from typing import Any, Dict, Optional, Union
 import sys
 import pymongo
 import logging
 from datetime import datetime
 
 this = sys.modules[__name__]
-this.db = None
+db: Any = None
 MAX_SERVER_DELAY = 5000
 
 logger = logging.getLogger(__name__)
 
 
-def setup():
+def setup() -> None:
+    global db
     client = pymongo.MongoClient(serverSelectionTimeoutMS=MAX_SERVER_DELAY)
     try:
-        client.admin.command('ismaster')
-        this.db = client.anidb_cache
+        client.admin.command("ismaster")
+        db = client.anidb_cache
     except pymongo.errors.ConnectionFailure:
-        logger.warn(
-            "Could not connect to cache server. This is highly unadvised.")
+        logger.warn("Could not connect to cache server. This is highly unadvised.")
         pass
 
 
-def save(command, message, response):
-    if this.db is None:
-        return
-    this.db[command].replace_one(dict(message=message),
-                                 dict(message=message,
-                                      response=response,
-                                      updated=datetime.now()),
-                                 upsert=True)
-
-
-def restore(collection, filter):
-    if this.db is None:
+def restore(collection: str, id: Union[str, int]) -> Optional[Dict[str, Any]]:
+    global db
+    if db is None:
         return None
-    return this.db[collection].find_one(filter, {'_id': 0})
+    return db[collection].find_one(dict(_id=id), dict(_id=0))  # type: ignore
 
 
-def update(collection, filter, data):
-    this.db[collection].update_one(filter, {'$set': data}, upsert=True)
-    return restore(collection, filter)
+def update(
+    collection: str, id: Union[str, int], data: Dict[str, Any]
+) -> Dict[str, Any]:
+    global db
+    db[collection].update_one(dict(_id=id), {"$set": data}, upsert=True)
+    return restore(collection, id)  # type: ignore

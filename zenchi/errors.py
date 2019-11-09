@@ -7,57 +7,49 @@ class APIError(ValueError):
 
 
 class IllegalParameterError(APIError):
-
-    def __init__(self):
-        super().__init__((
-            "505 ILLEGAL INPUT OR ACCESS DENIED. "
-            "There was an invalid parameter in packet data."))
+    def __init__(self) -> None:
+        super().__init__(
+            (
+                "505 ILLEGAL INPUT OR ACCESS DENIED. "
+                "There was an invalid parameter in packet data."
+            )
+        )
 
 
 class IllegalCommandError(APIError):
-
-    def __init__(self):
-        super().__init__((
-            "598 UNKNOWN COMMAND. "
-            "The provided command does not exists."))
+    def __init__(self) -> None:
+        super().__init__(
+            ("598 UNKNOWN COMMAND. " "The provided command does not exists.")
+        )
 
 
 class BannedError(APIError):
-
-    def __init__(self, reason):
-
-        super().__init__(f"555 BANNED. {reason}", reason)
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"555 BANNED. {reason}")
 
 
 class InvalidCredentialsError(APIError):
-
-    def __init__(self):
-        super().__init__((
-            "502 ACCESS DENIED. "
-            "Failed authenticating. Check credentials."))
+    def __init__(self) -> None:
+        super().__init__(
+            ("502 ACCESS DENIED. " "Failed authenticating. Check credentials.")
+        )
 
 
 class ClientOutdatedError(APIError):
-
-    def __init__(self):
-        super().__init__((
-            "503 CLIENT VERSION OUTDATED. "
-            "Protover too low."))
+    def __init__(self) -> None:
+        super().__init__(("503 CLIENT VERSION OUTDATED. " "Protover too low."))
 
 
 class ClientBannedError(APIError):
-
-    def __init__(self, reason):
-        super().__init__((
-            f"504 CLIENT BANNED. {reason} |"
-            "(it's not you, it's me). Update me."), reason)
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            (f"504 CLIENT BANNED. {reason} |" "(it's not you, it's me). Update me.")
+        )
 
 
 class UnhandledResponseError(APIError):
-
-    def __init__(self, data):
-        super().__init__(
-            f"The following response was not handled: {data}", data)
+    def __init__(self, data: str) -> None:
+        super().__init__(f"The following response was not handled: {data}")
 
 
 class EndpointError(ValueError):

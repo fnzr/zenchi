@@ -1,3 +1,4 @@
+from typing import Tuple, Dict, Callable, Any, Optional
 import logging
 from zenchi.lookup import int_list, str_list, to_bool
 import zenchi.cache as cache
@@ -58,66 +59,60 @@ OTHER_COUNT = 1 << 5
 TRAILER_COUNT = 1 << 4
 PARODY_COUNT = 1 << 3
 
-lookup = {
+lookup: Dict[int, Tuple[str, Callable[[str], Any]]] = {
     # Byte 1
-    AID: ('AID', int),
-    DATE_FLAGS: ('DATE_FLAGS', int),
-    YEAR: ('YEAR', str),
-    TYPE: ('TYPE', str),
-    RELATED_AID_LIST: ('RELATED_AID_LIST', str_list),
-    RELATED_AID_TYPE: ('RELATED_AID_TYPE', str),
-
+    AID: ("AID", int),
+    DATE_FLAGS: ("DATE_FLAGS", int),
+    YEAR: ("YEAR", str),
+    TYPE: ("TYPE", str),
+    RELATED_AID_LIST: ("RELATED_AID_LIST", str_list),
+    RELATED_AID_TYPE: ("RELATED_AID_TYPE", str),
     # Byte 2
-    ROMAJI_NAME: ('ROMAJI_NAME', str),
-    KANJI_NAME: ('KANJI_NAME', str),
-    ENGLISH_NAME: ('ENGLISH_NAME', str),
-    OTHER_NAME: ('OTHER_NAME', str),
-    SHORT_NAME: ('SHORT_NAME', str_list),
-    SYNONYM_LIST: ('SYNONYM_LIST', str_list),
-
+    ROMAJI_NAME: ("ROMAJI_NAME", str),
+    KANJI_NAME: ("KANJI_NAME", str),
+    ENGLISH_NAME: ("ENGLISH_NAME", str),
+    OTHER_NAME: ("OTHER_NAME", str),
+    SHORT_NAME: ("SHORT_NAME", str_list),
+    SYNONYM_LIST: ("SYNONYM_LIST", str_list),
     # Byte 3
-    EPISODES: ('EPISODES', int),
-    HIGHEST_EPISODE_NUMBER: ('HIGHEST_EPISODE_NUMBER', int),
-    SPECIAL_EP_COUNT: ('SPECIAL_EP_COUNT', int),
-    AIR_DATE: ('AIR_DATE', int),
-    END_DATE: ('END_DATE', int),
-    URL: ('URL', str),
-    PICNAME: ('PICNAME', str),
-
+    EPISODES: ("EPISODES", int),
+    HIGHEST_EPISODE_NUMBER: ("HIGHEST_EPISODE_NUMBER", int),
+    SPECIAL_EP_COUNT: ("SPECIAL_EP_COUNT", int),
+    AIR_DATE: ("AIR_DATE", int),
+    END_DATE: ("END_DATE", int),
+    URL: ("URL", str),
+    PICNAME: ("PICNAME", str),
     # Byte 4
-    RATING: ('RATING', int),
-    VOTE_COUNT: ('VOTE_COUNT', int),
-    TEMP_RATING: ('TEMP_RATING', int),
-    TEMP_VOTE: ('TEMP_VOTE', int),
-    AVERATE_VIEW_RATING: ('AVERATE_VIEW_RATING', int),
-    REVIEW_COUNT: ('REVIEW_COUNT', int),
-    AWARD_LIST: ('AWARD_LIST', str),
-    IS_18_RESTRICTED: ('IS_18_RESTRICTED', to_bool),
-
+    RATING: ("RATING", int),
+    VOTE_COUNT: ("VOTE_COUNT", int),
+    TEMP_RATING: ("TEMP_RATING", int),
+    TEMP_VOTE: ("TEMP_VOTE", int),
+    AVERATE_VIEW_RATING: ("AVERATE_VIEW_RATING", int),
+    REVIEW_COUNT: ("REVIEW_COUNT", int),
+    AWARD_LIST: ("AWARD_LIST", str),
+    IS_18_RESTRICTED: ("IS_18_RESTRICTED", to_bool),
     # Byte 5
-    ANN_ID: ('ANN_ID', int),
-    ALLCINEMA_ID: ('ALLCINEMA_ID', int),
-    ANIME_NFO_ID: ('ANIME_NFO_ID', str),
-    TAG_NAME_LIST: ('TAG_NAME_LIST', str_list),
-    TAG_ID_LIST: ('TAG_ID_LIST', int_list),
-    TAG_WEIGHT_LIST: ('TAG_WEIGHT_LIST', int_list),
-    DATE_RECORD_UPDATED: ('DATE_RECORD_UPDATED', int),
-
+    ANN_ID: ("ANN_ID", int),
+    ALLCINEMA_ID: ("ALLCINEMA_ID", int),
+    ANIME_NFO_ID: ("ANIME_NFO_ID", str),
+    TAG_NAME_LIST: ("TAG_NAME_LIST", str_list),
+    TAG_ID_LIST: ("TAG_ID_LIST", int_list),
+    TAG_WEIGHT_LIST: ("TAG_WEIGHT_LIST", int_list),
+    DATE_RECORD_UPDATED: ("DATE_RECORD_UPDATED", int),
     # Byte 6
-    CHARACTER_ID_LIST: ('CHARACTER_ID_LIST', int_list),
-
+    CHARACTER_ID_LIST: ("CHARACTER_ID_LIST", int_list),
     # Byte 7
-    SPECIALS_COUNT: ('SPECIALS_COUNT', int),
-    CREDITS_COUNT: ('CREDITS_COUNT', int),
-    OTHER_COUNT: ('OTHER_COUNT', int),
-    TRAILER_COUNT: ('TRAILER_COUNT', int),
-    PARODY_COUNT: ('PARODY_COUNT', int)
+    SPECIALS_COUNT: ("SPECIALS_COUNT", int),
+    CREDITS_COUNT: ("CREDITS_COUNT", int),
+    OTHER_COUNT: ("OTHER_COUNT", int),
+    TRAILER_COUNT: ("TRAILER_COUNT", int),
+    PARODY_COUNT: ("PARODY_COUNT", int),
 }
 
 
-def parse_response(input, response):
+def parse_response(input: int, response: str) -> Dict[str, Any]:
     result = dict()
-    parts = response.split('|')
+    parts = response.split("|")
     part_index = -1
     for i in range(56):
         index = input & (1 << i)
@@ -130,10 +125,10 @@ def parse_response(input, response):
     return result
 
 
-def filter_cached(input, aid):
+def filter_cached(input: int, aid: Optional[int]) -> int:
     if aid is None:
         return input
-    entry = cache.restore("ANIME", dict(AID=aid))
+    entry = cache.restore("ANIME", aid)
     if entry is None:
         return input
     for i in range(56):
