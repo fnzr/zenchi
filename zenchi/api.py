@@ -16,8 +16,8 @@ import threading
 from functools import wraps
 from time import sleep
 from zenchi import cache, settings
-from zenchi.lookup import anime as alookup
-from zenchi.lookup import int_list
+from zenchi.mappings import anime as alookup
+from zenchi.mappings import int_list
 import zenchi.crypto as crypto
 import zenchi.errors as errors
 
