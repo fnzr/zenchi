@@ -99,7 +99,6 @@ def create_socket(
     logger.info(
         f"Created socket on UDP %s:%d => %s:%d", host, port, anidb_server, anidb_port
     )
-    cache.setup()
     global _conn
     _conn = s
     return s
@@ -169,7 +168,7 @@ def send(
     code = int(api_response[:3])
     result = callback(code, api_response)
     if result is not None:
-        logger.debug(data)
+        logger.debug(result)
         return result, code
     if code == 505:
         raise errors.IllegalParameterError
@@ -541,7 +540,7 @@ def calendar() -> EndpointResult:
 
     See https://wiki.anidb.net/w/UDP_API_Definition#CALENDAR:_Get_Upcoming_Titles
     
-    :return: A tuple (data, code). data is a dictionary with the keys:
+    :return: a tuple (data, code). data is a dictionary with the keys:
         if code == 397:
             :message str: CALENDAR EMPTY
         if code == 297:
@@ -572,3 +571,53 @@ def calendar() -> EndpointResult:
         return None
 
     return send("CALENDAR", {}, cb)
+
+
+def creator(creatorid: int) -> EndpointResult:
+    """Retrieve creator information.
+    
+    :param creatorid: anidb creator id
+    :type creatorid: int
+    :return: a tuple (data, code). data is a dictionary with the keys:
+        if code == 345:
+            :message str: NO SUCH CREATOR
+        if code == 245:                    
+            :creatorid int:
+            :creator_name_kanji str:
+            :creator_name_transcription str:
+            :type int:
+            :pic_name str:
+            :url_english str:
+            :url_japanese str:
+            :wiki_url_english str:
+            :wiki_url_japanese str:
+            :last_update_date int:
+    :rtype: EndpointResult
+    """
+    command = "CREATOR"
+
+    def cb(code: int, response: str) -> Optional[EndpointDict]:
+        if code == 345:
+            return dict(message=response[3:].strip())
+        if code == 245:
+            parts = response.splitlines()[1].split("|")
+            result = {
+                "creatorid": int(parts[0]),
+                "creator_name_kanji": parts[1],
+                "creator_name_transcription": parts[2],
+                "type": int(parts[3]),
+                "pic_name": parts[4],
+                "url_english": parts[5],
+                "url_japanese": parts[6],
+                "wiki_url_english": parts[7],
+                "wiki_url_japanese": parts[8],
+                "last_update_date": int(parts[9]),
+            }
+            cache.update(command, creatorid, result)
+            return result
+        return None
+
+    entry = cache.restore(command, creatorid)
+    if entry is None:
+        return send(command, dict(creatorid=creatorid), cb)
+    return entry, 233
