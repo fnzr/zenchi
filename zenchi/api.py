@@ -389,7 +389,7 @@ def ping(nat: bool = False) -> EndpointResult:
 
 
 def anime(
-    amask: int, aid: int = 0, aname: str = ''
+    amask: int, aid: int = 0, aname: str = '', use_cache: bool = True
 ) -> EndpointResult:
     """Retrieve anime data according to mask.
 
@@ -415,7 +415,10 @@ def anime(
     :rtype: EndpointResult
     """
     command = "ANIME"
-    filtered_mask = mappings.anime.filter_cached(amask, aid)
+    if use_cache:
+        filtered_mask = mappings.anime.filter_cached(amask, aid)
+    else:
+        filtered_mask = amask
     data: PacketParameters = dict(amask=format(filtered_mask, "x"))
     if aid:
         if filtered_mask == 0:
@@ -449,7 +452,7 @@ def anime(
     return send(command, data, cb)
 
 
-def animedesc(aid: int, part: int) -> EndpointResult:
+def animedesc(aid: int, part: int, use_cache: bool = True) -> EndpointResult:
     """Retrieve partial anime description.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#ANIMEDESC:_Retrieve_Anime_Description
@@ -485,13 +488,13 @@ def animedesc(aid: int, part: int) -> EndpointResult:
         return None
 
     entry = cache.restore(command, id)
-    if entry is None:
+    if not use_cache or entry is None:
         data: PacketParameters = dict(aid=aid, part=part)
         return send(command, data, cb)
     return entry, 233
 
 
-def character(charid: int) -> EndpointResult:
+def character(charid: int, use_cache: bool = True) -> EndpointResult:
     """Retrieve character details.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#CHARACTER:_Get_Character_Information
@@ -553,7 +556,7 @@ def character(charid: int) -> EndpointResult:
         return None
 
     entry = cache.restore(command, charid)
-    if entry is None:
+    if not use_cache or entry is None:
         return send(command, dict(charid=charid), cb)
     return entry, 235
 
@@ -596,7 +599,7 @@ def calendar() -> EndpointResult:
     return send("CALENDAR", {}, cb)
 
 
-def creator(creatorid: int) -> EndpointResult:
+def creator(creatorid: int, use_cache: bool = True) -> EndpointResult:
     """Retrieve creator information.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#CREATOR:_Get_Creator_Information
@@ -643,13 +646,13 @@ def creator(creatorid: int) -> EndpointResult:
         return None
 
     entry = cache.restore(command, creatorid)
-    if entry is None:
+    if not use_cache or entry is None:
         return send(command, dict(creatorid=creatorid), cb)
     return entry, 233
 
 
 def episode(
-    eid: int = 0, aid: int = 0, aname: str = "", epno: str = ""
+    eid: int = 0, aid: int = 0, aname: str = "", epno: str = "", use_cache: bool = True
 ) -> EndpointResult:
     """Retrieve episode information from server.
 
@@ -728,7 +731,7 @@ def episode(
         return None
 
     entry = cache.restore(command, criteria)
-    if entry is None:
+    if not use_cache or entry is None:
         return send(command, criteria, cb)
     return entry, 233
 
@@ -781,7 +784,7 @@ def updated(age: int = 0, time: int = 0, entity: int = 1) -> EndpointResult:
     return send("UPDATED", criteria, cb)
 
 
-def group(gid: int = 0, gname: str = "") -> EndpointResult:
+def group(gid: int = 0, gname: str = "", use_cache: bool = True) -> EndpointResult:
     """Retrieve group information from server.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#GROUP:_Retrieve_Group_Data
@@ -853,7 +856,7 @@ def group(gid: int = 0, gname: str = "") -> EndpointResult:
 
     # TODO if short name is provided, the cache doesnt work.
     entry = cache.restore(command, criteria)
-    if entry is None:
+    if not use_cache or entry is None:
         return send(command, criteria, cb)
     return entry, 233
 
