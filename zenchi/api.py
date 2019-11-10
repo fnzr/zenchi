@@ -16,7 +16,7 @@ import threading
 from functools import wraps
 from time import sleep
 from zenchi import cache, settings
-from zenchi.mappings import anime as alookup
+import zenchi.mappings as mappings
 from zenchi.mappings import int_list
 import zenchi.crypto as crypto
 import zenchi.errors as errors
@@ -400,14 +400,14 @@ def anime(
             return dict(message=response[3:].strip())
         if code == 230:
             content = response.splitlines()[1]
-            result = alookup.parse_response(amask, content)
+            result = mappings.anime.parse_response(amask, content)
             if aid:
                 return cache.update(command, aid, result)
             else:
                 return result
         return None
 
-    filtered_mask = alookup.filter_cached(amask, aid)
+    filtered_mask = mappings.anime.filter_cached(amask, aid)
     data: PacketParameters = dict(amask=format(filtered_mask, "x"))
     if aid is not None:
         if filtered_mask == 0:
@@ -575,6 +575,8 @@ def calendar() -> EndpointResult:
 
 def creator(creatorid: int) -> EndpointResult:
     """Retrieve creator information.
+
+    See https://wiki.anidb.net/w/UDP_API_Definition#CREATOR:_Get_Creator_Information
     
     :param creatorid: anidb creator id
     :type creatorid: int
@@ -658,8 +660,9 @@ def episode(
             :eng str:
             :romaji str:
             :kanji str:
-            :aired": int:
-            :type: int:
+            :aired int:
+            :type int:
+            :episode_number int: episode number without special character
     :rtype: EndpointResult
     """
     criteria: Union[int, Dict[str, Any]]
@@ -694,7 +697,9 @@ def episode(
                 "kanji": parts[8],
                 "aired": int(parts[9]),
                 "type": int(parts[10]),
+                "episode_number": int(parts[5][1:]),
             }
+
             cache.update(command, result["eid"], result)
             return result
         return None
