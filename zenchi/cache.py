@@ -3,7 +3,6 @@
 Really, I just dump it on the database.
 """
 from typing import Any, Dict, Optional, Union
-import sys
 import pymongo
 import logging
 from datetime import datetime
@@ -27,7 +26,7 @@ def setup() -> Any:
 
     Will send an warning if the connection is not successfull, but will proceed just fine.
     You really should use some kind of cache though.
-    
+
     :return: [description]
     :rtype: None
     """
@@ -48,7 +47,7 @@ def restore(
     collection: str, id: Union[str, int, Dict[str, Any]]
 ) -> Optional[Dict[str, Any]]:
     """Restrieve cached data from database.
-    
+
     :param collection: The collection to be retrieved. Same name as API commands.
     :type collection: str
     :param id: The unique identifier for a particular collection. This varies by command.

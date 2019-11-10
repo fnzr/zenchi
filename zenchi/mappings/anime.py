@@ -116,7 +116,7 @@ lookup: Dict[int, Tuple[str, Callable[[str], Any]]] = {
 
 def parse_response(input: int, response: str) -> Dict[str, Any]:
     """Parse API response to ANIME command into a dictionary.
-    
+
     :param input: mask used to send the command
     :type input: int
     :param response: string sent as response to the command
@@ -140,7 +140,7 @@ def parse_response(input: int, response: str) -> Dict[str, Any]:
 
 def filter_cached(input: int, aid: Optional[int]) -> int:
     """Filter out cached values for ANIME, lessening server load.
-    
+
     :param input: original requested mask
     :type input: int
     :param aid: anime id

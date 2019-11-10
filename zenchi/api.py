@@ -1,7 +1,6 @@
 """Placeholder."""
 from typing import (
     Callable,
-    List,
     Any,
     Dict,
     Tuple,
@@ -12,8 +11,6 @@ from typing import (
 )
 import socket
 import logging
-import threading
-from functools import wraps
 from time import sleep
 from zenchi import cache, settings
 import zenchi.mappings as mappings
@@ -42,7 +39,7 @@ PUBLIC_COMMANDS = ["PING", "ENCRYPT", "ENCODING", "AUTH", "VERSION"]
 
 def value_or_error(env_name: str, value: T) -> T:
     """Shorthand method to check is a variable has appropriate value.
-    
+
     :param env_name: name of environment variable to default to if value is not set.
     :type env_name: str
     :param value: the provided value of the variable.
@@ -63,7 +60,7 @@ def _listen_incoming_packets() -> Iterator[bytes]:
     """Wait until received a packet from the server.
 
     TODO: this hangs indefinetely if no data is received.
-    
+
     :return: The raw data from the server.
     :rtype: Iterator[bytes]
     """
@@ -107,7 +104,7 @@ def create_socket(
 
 def get_socket() -> socket.socket:
     """Create socket if doesn't exist. Returns it.
-    
+
     :return: Socket used for all communication with the server.
     :rtype: socket.socket
     """
@@ -134,7 +131,7 @@ def send(
     :type callback: Callable[[int, str], Optional[EndpointDict]]
     :raises ValueError: [description]
     :raises errors.APIError: this actually raises specific Errors according to response code.
-        If this was raised, the server rejected the request for some reason.    
+        If this was raised, the server rejected the request for some reason.
     :raises ValueError: raised if there was an attempt to send a request to a restricted endpoint without authenticating first.
     Call auth() and repeat the request.
     :return: a tuple (data, code). See docs of specific commands for details.
@@ -270,7 +267,7 @@ def logout() -> EndpointResult:
     """Clear the session and invalidates it to the server.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#LOGOUT:_Logout
-    
+
     :return: A tuple (data, code). data is a dictionary with the keys:
         :message str: the returned message from the server.
     :rtype: EndpointResult
@@ -290,14 +287,14 @@ def encrypt(username: str = "", api_key: str = "", type: int = 1) -> EndpointRes
     """Enable encrypted communication with the server until new connection or logout.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#ENCRYPT:_Start_Encryptedsession
-    
+
     :param username: anidb user. Defaults to environment ANIDB_USERNAME
     :type username: str, optional
     :param api_key: anidb user. Defaults to environment ANIDB_ENCRYPT_API_KEY
     :type api_key: str, optional
     :param type: required for command. Do not modify. Defaults to 1
     :type type: int, optional
-    :return: A tuple (data, code). 
+    :return: A tuple (data, code).
         If the command is successful, data is a dictionary with the keys:
             :salt str: salt to be used with api_key to encrypt and decrypt future messages.
         If not:
@@ -312,7 +309,7 @@ def encrypt(username: str = "", api_key: str = "", type: int = 1) -> EndpointRes
             return dict(message=response[3:].strip())
         if code == 209:
             salt = response.split(" ")[1].strip()
-            crypto.setup(api_key + salt)  # type: ignore
+            crypto.setup(api_key + salt)
             global _encryptedsession
             _encryptedsession = True
             logger.info("Successfully registered encryption.")
@@ -328,7 +325,7 @@ def encoding(name: str) -> EndpointResult:
     See https://wiki.anidb.net/w/UDP_API_Definition#ENCODING:_Change_Encoding_forsession # noqa
 
     TODO: is it even possible to "restore" a session?
-    
+
     :param name: encoding name
     :type name: str
     :return: A tuple (data, code). data is a dictionary with the keys:
@@ -348,7 +345,7 @@ def ping(nat: bool = False) -> EndpointResult:
     """Ping the server.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#PING:_Ping_Command
-    
+
     :param nat: determine if server should inform the outgoing port. Defaults to False.
     :type nat: bool
     :return: A tuple (data, code). data is a dictionary with the key:
@@ -435,7 +432,7 @@ def animedesc(aid: int, part: int) -> EndpointResult:
     """Retrieve partial anime description.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#ANIMEDESC:_Retrieve_Anime_Description
-    
+
     :param aid: anidb id of anime.
     :type aid: int
     :param part: part of the description. One description might span several parts.
@@ -477,7 +474,7 @@ def character(charid: int) -> EndpointResult:
     """Retrieve character details.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#CHARACTER:_Get_Character_Information
-    
+
     :param charid: anidb id of the character.
     :type charid: int
     :return: A tuple (data, code). data is a dictionary with the keys:
@@ -544,7 +541,7 @@ def calendar() -> EndpointResult:
     """Retrieve recently aired and upcoming shows.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#CALENDAR:_Get_Upcoming_Titles
-    
+
     :return: a tuple (data, code). data is a dictionary with the keys:
         if code == 397:
             :message str: CALENDAR EMPTY
@@ -582,13 +579,13 @@ def creator(creatorid: int) -> EndpointResult:
     """Retrieve creator information.
 
     See https://wiki.anidb.net/w/UDP_API_Definition#CREATOR:_Get_Creator_Information
-    
+
     :param creatorid: anidb creator id
     :type creatorid: int
     :return: a tuple (data, code). data is a dictionary with the keys:
         if code == 345:
             :message str: NO SUCH CREATOR
-        if code == 245:                    
+        if code == 245:
             :creatorid int:
             :creator_name_kanji str:
             :creator_name_transcription str:
@@ -642,7 +639,7 @@ def episode(
         - aid and epno
         - aname and epno
 
-    
+
     :param eid: anidb episode id
     :type eid: int, optional
     :param aid: anidb anime id
@@ -655,7 +652,7 @@ def episode(
     :return: a tuple (data, code). data is a dictionary with the keys:
         if code == 340:
             :message str: NO SUCH EPISODE
-        if code == 245:                    
+        if code == 245:
             :eid int:
             :aid int:
             :length int:
@@ -720,7 +717,7 @@ def updated(age: int = 0, time: int = 0, entity: int = 1) -> EndpointResult:
 
     See https://wiki.anidb.net/w/UDP_API_Definition#UPDATED:_Get_List_of_Updated_Anime_IDs
     Exactly one of age or time must be provided.
-    
+
     :param age: updated in the last `age` days
     :type age: int, optional
     :param time: updated since `time` as unix timestamp
@@ -731,7 +728,7 @@ def updated(age: int = 0, time: int = 0, entity: int = 1) -> EndpointResult:
     :return: a tuple (data, code). data is a dictionary with the keys:
         if code == 343:
             :message str: NO UPDATES
-        if code == 243:                    
+        if code == 243:
             :entity int:
             :total_count int:
             :last_update_date int:
@@ -768,7 +765,7 @@ def group(gid: int = 0, gname: str = "") -> EndpointResult:
 
     See https://wiki.anidb.net/w/UDP_API_Definition#GROUP:_Retrieve_Group_Data
     One of gid, gname must be provided.
-    
+
     :param gid: anidb group id
     :type gid: int, optional
     :param gname: anidb group name or shortname
@@ -777,7 +774,7 @@ def group(gid: int = 0, gname: str = "") -> EndpointResult:
     :return: a tuple (data, code). data is a dictionary with the keys:
         if code == 350:
             :message str: NO SUCH GROUP
-        if code == 250:                    
+        if code == 250:
             :gid int:
             :rating int:
             :votes int:
@@ -842,7 +839,7 @@ def group(gid: int = 0, gname: str = "") -> EndpointResult:
 
 def groupstatus(aid: int, state: int = 0) -> EndpointResult:
     """Retrieve anime release status for different groups.
-    
+
     :param aid: anidb anime id
     :type aid: int
     :param state: release state. int 1 to 6. Example: zenchi.mappings.group_status.ONGOING

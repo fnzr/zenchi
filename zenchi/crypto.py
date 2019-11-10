@@ -5,15 +5,13 @@ Thanks https://github.com/adameste/anidbcli
 from typing import Any
 from Crypto.Cipher import AES
 import hashlib
-import sys
-from . import settings
 
 BS = 16
 
 
 def pad(s: str) -> str:
     """Pad string with PKCS5Padding scheme.
-    
+
     :param s: string to be padded
     :type s: str
     :return: padded string
@@ -24,13 +22,13 @@ def pad(s: str) -> str:
 
 def unpad(s: str) -> str:
     """Unpad string.
-    
+
     :param s: string to be unpadded
     :type s: str
     :return: unpadded string
     :rtype: str
     """
-    return s[0 : -ord(s[-1])]
+    return s[0: -ord(s[-1])]
 
 
 aes: Any = None
@@ -38,7 +36,7 @@ aes: Any = None
 
 def setup(key: str) -> None:
     """Generate aes object with given key.
-    
+
     :param key: api_key of user plus provided salt from ENCRYPT command
     :type key: str
     :rtype: None
@@ -50,7 +48,7 @@ def setup(key: str) -> None:
 
 def encrypt(message: str, encoding: str) -> bytes:
     """Encrypt message to be sent to server. setup MUST be called first.
-    
+
     :param message: message to be encrypted.
     :type message: str
     :param encoding:
@@ -66,7 +64,7 @@ def encrypt(message: str, encoding: str) -> bytes:
 
 def decrypt(message: bytes, encoding: str) -> str:
     """Decrypt message received from server. setup MUST be called first.
-    
+
     :param message: message to be decrypted.
     :type message: bytes
     :param encoding:

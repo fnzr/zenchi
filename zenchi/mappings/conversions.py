@@ -15,7 +15,7 @@ def str_list(data: str) -> List[str]:
 
 def int_list(data: str) -> List[int]:
     """Generate a int list.
-    
+
     :param data: comma separated string of ints
     :type data: str
     :return: List. of int.
@@ -29,7 +29,7 @@ def int_list(data: str) -> List[int]:
 
 def to_bool(data: str) -> bool:
     """Convert only '1' to True, else False.
-    
+
     :param data: Usually part of API response.
     :type data: str
     :return: Take a guess.

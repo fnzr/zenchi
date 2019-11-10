@@ -10,7 +10,7 @@ OTHER = 6
 
 def parse_relations(group_relations: str) -> List[Tuple[int, int]]:
     """Retrieve group relations according to API specification.
-    
+
     :param group_relations: raw grouprelations string, as sent from API
     :type group_relations: str
     :return: list of (other group id, relation type) tuples
