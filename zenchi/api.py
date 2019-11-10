@@ -703,3 +703,52 @@ def episode(
     if entry is None:
         return send(command, criteria, cb)
     return entry, 233
+
+
+def updated(age: int = 0, time: int = 0, entity: int = 1) -> EndpointResult:
+    """Retrieve updated anime ids since specified time.
+
+    See https://wiki.anidb.net/w/UDP_API_Definition#UPDATED:_Get_List_of_Updated_Anime_IDs
+    Exactly one of age or time must be provided.
+    
+    :param age: updated in the last `age` days
+    :type age: int, optional
+    :param time: updated since `time` as unix timestamp
+    :type time: int, optional
+    :param entity: do not modify.
+    :type entity: int, optional
+    :raises ValueError: raised if neither or both age and time are provided.
+    :return: a tuple (data, code). data is a dictionary with the keys:
+        if code == 343:
+            :message str: NO UPDATES
+        if code == 243:                    
+            :entity int:
+            :total_count int:
+            :last_update_date int:
+            :aid_list List[int]:
+    :rtype: EndpointResult
+    """
+    if (age and time) or not (age or time):
+        raise ValueError("Exactly one of age or time must be provided.")
+
+    criteria = dict(entity=entity)
+    if age:
+        criteria["age"] = age
+    else:
+        criteria["time"] = time
+
+    def cb(code: int, response: str) -> Optional[EndpointDict]:
+        if code == 343:
+            return dict(message=response[3:].strip())
+        if code == 243:
+            parts = response.splitlines()[1].split("|")
+            return {
+                "entity": int(parts[0]),
+                "total_count": int(parts[1]),
+                "last_update_date": int(parts[2]),
+                "aid_list": int_list(parts[3]),
+            }
+        return None
+
+    return send("UPDATED", criteria, cb)  # type: ignore
+
