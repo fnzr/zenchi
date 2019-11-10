@@ -833,3 +833,61 @@ def group(gid: int = 0, gname: str = "") -> EndpointResult:
     if entry is None:
         return send(command, criteria, cb)
     return entry, 233
+
+
+def groupstatus(aid: int, state: int = 0) -> EndpointResult:
+    """Retrieve anime release status for different groups.
+    
+    :param aid: anidb anime id
+    :type aid: int
+    :param state: release state. int 1 to 6. Example: zenchi.mappings.group_status.ONGOING
+    :type state: int, optional
+    :return: a tuple (data, code). data is a dictionary with the keys:
+        if code == (325, 330:
+            :message str: NO SUCH GROUPS FOUND, NO SUCH ANIME
+        if code == 225:
+            :status: List of dictionaries with the following keys:
+                :group_id int:
+                :group_name str:
+                :completion_state int:
+                :last_episode_number int:
+                :rating int:
+                :votes int:
+                :episode_range str:
+            :truncated bool: if the response was truncated because it didn't fit the UDP packet, this will be True.
+    :rtype: EndpointResult
+    """
+
+    def cb(code: int, response: str) -> Optional[EndpointDict]:
+        if code in (325, 330):
+            return dict(message=response[3:].strip())
+        if code == 225:
+            result = []
+            groups_data = response.splitlines()[1:]
+            truncated = False
+            for group_data in groups_data:
+                parts = group_data.split("|")
+                if len(parts) < 7:
+                    logger.warning(
+                        "Response was truncated, too much data for UDP packet."
+                    )
+                    truncated = True
+                    break
+                result.append(
+                    {
+                        "group_id": int(parts[0]),
+                        "group_name": parts[1],
+                        "completion_state": int(parts[2]),
+                        "last_episode_number": int(parts[3]),
+                        "rating": int(parts[4]),
+                        "votes": int(parts[5]),
+                        "episode_range": parts[6],
+                    }
+                )
+            return dict(status_list=result, truncated=truncated)
+        return None
+
+    params: Dict[str, Union[str, int]] = dict(aid=aid)
+    if state:
+        params["state"] = state
+    return send("GROUPSTATUS", params, cb)

@@ -1,0 +1,8 @@
+"""Group status constants."""
+
+ONGOING = 1
+STALLED = 2
+COMPLETE = 3
+DROPPED = 4
+FINISHED = 5
+SPECIALS_ONLY = 6
