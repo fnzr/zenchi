@@ -736,7 +736,7 @@ def updated(age: int = 0, time: int = 0, entity: int = 1) -> EndpointResult:
     if (age and time) or not (age or time):
         raise ValueError("Exactly one of age or time must be provided.")
 
-    criteria = dict(entity=entity)
+    criteria: Dict[str, Union[str, int]] = dict(entity=entity)
     if age:
         criteria["age"] = age
     else:
@@ -755,5 +755,81 @@ def updated(age: int = 0, time: int = 0, entity: int = 1) -> EndpointResult:
             }
         return None
 
-    return send("UPDATED", criteria, cb)  # type: ignore
+    return send("UPDATED", criteria, cb)
 
+
+def group(gid: int = 0, gname: str = "") -> EndpointResult:
+    """Retrieve group information from server.
+
+    See https://wiki.anidb.net/w/UDP_API_Definition#GROUP:_Retrieve_Group_Data
+    One of gid, gname must be provided.
+    
+    :param gid: anidb group id
+    :type gid: int, optional
+    :param gname: anidb group name or shortname
+    :type gname: str, optional
+    :raises ValueError: raised if neither gid or gname are provided.
+    :return: a tuple (data, code). data is a dictionary with the keys:
+        if code == 350:
+            :message str: NO SUCH GROUP
+        if code == 250:                    
+            :gid int:
+            :rating int:
+            :votes int:
+            :acount int:
+            :fcount int:
+            :name str:
+            :short str:
+            :irc_channel str:
+            :irc_server str:
+            :url str:
+            :picname str:
+            :foundeddate int:
+            :disbandeddate int:
+            :dateflags int:
+            :lastreleasedate int:
+            :lastactivitydate int:
+            :grouprelations List[Tuple[int, int]]: list of (other group id, relation type)
+    :rtype: EndpointResult
+    """
+    command = "GROUP"
+    criteria: Dict[str, Union[str, int]] = {}
+    if gid:
+        criteria["gid"] = gid
+    elif gname:
+        criteria["gname"] = gname
+    else:
+        raise ValueError("Either gid or gname must be provided")
+
+    def cb(code: int, response: str) -> Optional[EndpointDict]:
+        if code == 350:
+            return dict(message=response[3:].strip())
+        if code == 250:
+            parts = response.splitlines()[1].split("|")
+            result: Dict[str, Any] = {
+                "gid": int(parts[0]),
+                "rating": int(parts[1]),
+                "votes": int(parts[2]),
+                "acount": int(parts[3]),
+                "fcount": int(parts[4]),
+                "name": parts[5],
+                "short": parts[6],
+                "irc_channel": parts[7],
+                "irc_server": parts[8],
+                "url": parts[9],
+                "picname": parts[10],
+                "foundeddate": int(parts[11]),
+                "disbandeddate": int(parts[12]),
+                "dateflags": int(parts[13]),
+                "lastreleasedate": int(parts[14]),
+                "lastactivitydate": int(parts[15]),
+                "grouprelations": mappings.group.parse_relations(parts[16]),
+            }
+            return cache.update(command, result["gid"], result)
+        return None
+
+    # TODO if short name is provided, the cache doesnt work.
+    entry = cache.restore(command, criteria)
+    if entry is None:
+        return send(command, criteria, cb)
+    return entry, 233
