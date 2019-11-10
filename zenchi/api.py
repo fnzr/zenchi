@@ -17,6 +17,7 @@ import zenchi.mappings as mappings
 from zenchi.mappings import int_list
 import zenchi.crypto as crypto
 import zenchi.errors as errors
+from zenchi.codes import response_message
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +51,9 @@ def value_or_error(env_name: str, value: T) -> T:
     """
     if value:
         return value
-    env_value = settings.__dict__[env_name]
+    env_value: T = settings.__dict__[env_name]
     if env_value:
-        return env_value  # type: ignore
+        return env_value
     raise ValueError(f"{env_name} is required but is not in env nor was a parameter")
 
 
@@ -175,6 +176,8 @@ def send(
         raise errors.BannedError(api_response.splitlines()[1])
     if code == 502:
         raise errors.InvalidCredentialsError
+    if code in (600, 601, 602):
+        raise errors.ServerUnavailableError(code)
     if code == 501:
         logger.info("501 LOGIN FIRST. Sending auth and retrying.")
         auth()
@@ -186,10 +189,6 @@ def send(
             return send(command, args, callback)
         else:
             raise errors.InvalidSessionError
-    if code in (600, 601, 602):
-        logger.info("[%d] Server unavailable. Delaying and resending.", code)
-        sleep(30)
-        return send(command, args, callback)
     if code == 604:
         logger.info("[%d] Server timeout. Delaying and resending.", code)
         sleep(5)
@@ -277,7 +276,7 @@ def logout() -> EndpointResult:
         if code in (403, 203):
             global session
             session = ""
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         return None
 
     return send("LOGOUT", {}, cb)
@@ -306,7 +305,7 @@ def encrypt(username: str = "", api_key: str = "", type: int = 1) -> EndpointRes
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code in (309, 509, 394):
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         if code == 209:
             salt = response.split(" ")[1].strip()
             crypto.setup(api_key + salt)
@@ -335,7 +334,7 @@ def encoding(name: str) -> EndpointResult:
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code in (519, 219):
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         return None
 
     return send("ENCODING", dict(name=name), cb)
@@ -363,7 +362,7 @@ def ping(nat: bool = False) -> EndpointResult:
                 return {}
         return None
 
-    data: PacketParameters = {} if nat else dict(nat=1)
+    data: PacketParameters = dict(nat=1) if nat else {}
     return send("PING", data, cb)
 
 
@@ -399,7 +398,7 @@ def anime(
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code == 330:
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         if code == 230:
             content = response.splitlines()[1]
             result = mappings.anime.parse_response(amask, content)
@@ -451,7 +450,7 @@ def animedesc(aid: int, part: int) -> EndpointResult:
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code in (330, 330):
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         if code == 233:
             parts = response.splitlines()[1].split("|")
             result = {
@@ -502,7 +501,7 @@ def character(charid: int) -> EndpointResult:
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code == 335:
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         if code == 235:
             data = response.splitlines()[1].split("|")
             result = {
@@ -556,7 +555,7 @@ def calendar() -> EndpointResult:
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code == 397:
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         if code == 297:
             lines = response.splitlines()[1:]
             result = []
@@ -602,7 +601,7 @@ def creator(creatorid: int) -> EndpointResult:
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code == 345:
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         if code == 245:
             parts = response.splitlines()[1].split("|")
             result = {
@@ -684,7 +683,7 @@ def episode(
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code == 340:
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         if code == 240:
             parts = response.splitlines()[1].split("|")
             result: Dict[str, Union[str, int]] = {
@@ -746,7 +745,7 @@ def updated(age: int = 0, time: int = 0, entity: int = 1) -> EndpointResult:
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code == 343:
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         if code == 243:
             parts = response.splitlines()[1].split("|")
             return {
@@ -805,7 +804,7 @@ def group(gid: int = 0, gname: str = "") -> EndpointResult:
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code == 350:
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         if code == 250:
             parts = response.splitlines()[1].split("|")
             result: Dict[str, Any] = {
@@ -862,7 +861,7 @@ def groupstatus(aid: int, state: int = 0) -> EndpointResult:
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code in (325, 330):
-            return dict(message=response[3:].strip())
+            return dict(message=response_message[code])
         if code == 225:
             result = []
             groups_data = response.splitlines()[1:]

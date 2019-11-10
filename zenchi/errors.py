@@ -1,4 +1,5 @@
 """Undesireables."""
+from zenchi.codes import response_message
 
 
 class APIError(ValueError):
@@ -57,6 +58,13 @@ class InvalidSessionError(APIError):
                 "506 INVALID SESSION."
                 "A session is being expected but was not sent. Is the client outdated?"
             )
+        )
+
+
+class ServerUnavailableError(APIError):
+    def __init__(self, code: int) -> None:
+        super().__init__(
+            (f"{code} {response_message[code]}." "Server unavailable. Try again later.")
         )
 
 
