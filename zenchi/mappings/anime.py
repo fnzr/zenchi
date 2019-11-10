@@ -138,7 +138,7 @@ def parse_response(input: int, response: str) -> Dict[str, Any]:
     return result
 
 
-def filter_cached(input: int, aid: Optional[int]) -> int:
+def filter_cached(input: int, aid: int) -> int:
     """Filter out cached values for ANIME, lessening server load.
 
     :param input: original requested mask
@@ -148,7 +148,7 @@ def filter_cached(input: int, aid: Optional[int]) -> int:
     :return: new mask with less or igual value.
     :rtype: int
     """
-    if aid is None:
+    if not aid:
         return input
     entry = cache.restore("anime", aid)
     if entry is None:

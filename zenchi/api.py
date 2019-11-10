@@ -33,7 +33,7 @@ PacketParameters = Dict[str, Union[str, int]]
 _conn: Optional[socket.socket] = None
 _encryptedsession = False
 _encoding = "UTF8"
-session = ""
+_session = ""
 
 PUBLIC_COMMANDS = ["PING", "ENCRYPT", "ENCODING", "AUTH", "VERSION"]
 
@@ -66,6 +66,7 @@ def _listen_incoming_packets() -> Iterator[bytes]:
     :rtype: Iterator[bytes]
     """
     s = get_socket()
+    s.settimeout(30)
     while True:
         yield s.recv(MAX_RECEIVE_SIZE)
     return b""
@@ -139,8 +140,8 @@ def send(
     :rtype: EndpointResult
     """
     if command not in PUBLIC_COMMANDS:
-        if session:
-            args["s"] = session
+        if _session:
+            args["s"] = _session
         else:
             raise ValueError(
                 "Trying to send a command that requires a session without calling auth() first"
@@ -194,6 +195,27 @@ def send(
         sleep(5)
         return send(command, args, callback)
     raise errors.UnhandledResponseError(api_response)
+
+
+def restore_session(session: str, enc: str = 'UTF8') -> EndpointResult:
+    """Set current session to `session` and call ENCODING command.
+
+    WARNING: it technically works but if a new socket was created and/or the outgoing
+    port changed (external, not internal), the server sends 501 in the first non-public endpoint.
+    I think.
+
+    :param session: the string obtained from a previous session.
+    :type session: str
+    :param enc: encoding to be used in the session.
+    :return: the result of a ENCODING command.
+    :rtype: EndpointResult
+    """
+    global _encoding
+    _encoding = enc
+
+    global _session
+    _session = session
+    return encoding(_encoding)
 
 
 def auth(
@@ -251,9 +273,9 @@ def auth(
             raise errors.ClientBannedError(reason)
         if code in (200, 201):
             parts = response.split(" ")
-            global session
-            session = parts[1]
-            result = dict(session=session)
+            global _session
+            _session = parts[1]
+            result = dict(session=_session)
             if nat:
                 result["nat"] = parts[2]
             return result
@@ -274,8 +296,8 @@ def logout() -> EndpointResult:
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code in (403, 203):
-            global session
-            session = ""
+            global _session
+            _session = ""
             return dict(message=response_message[code])
         return None
 
@@ -367,7 +389,7 @@ def ping(nat: bool = False) -> EndpointResult:
 
 
 def anime(
-    amask: int, aid: Optional[int] = None, aname: Optional[str] = None
+    amask: int, aid: int = 0, aname: str = ''
 ) -> EndpointResult:
     """Retrieve anime data according to mask.
 
@@ -392,9 +414,25 @@ def anime(
         TODO: currently, if some anime data is in the cache, ALL anime data is returned.
     :rtype: EndpointResult
     """
-    if aid is None and aname is None:
-        raise ValueError("Either aid or aname must be provided")
     command = "ANIME"
+    filtered_mask = mappings.anime.filter_cached(amask, aid)
+    data: PacketParameters = dict(amask=format(filtered_mask, "x"))
+    if aid:
+        if filtered_mask == 0:
+            restored = cache.restore(command, aid)
+            if restored is not None:
+                return restored, 230
+        data["aid"] = aid
+    elif aname:
+        data["aname"] = aname
+        logger.warning(
+            (
+                "Using aname to search for ANIME prevents cache from working"
+                "Consider using aid instead."
+            )
+        )
+    else:
+        raise ValueError("Either aid or aname must be provided")
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code == 330:
@@ -408,22 +446,6 @@ def anime(
                 return result
         return None
 
-    filtered_mask = mappings.anime.filter_cached(amask, aid)
-    data: PacketParameters = dict(amask=format(filtered_mask, "x"))
-    if aid is not None:
-        if filtered_mask == 0:
-            restored = cache.restore(command, aid)
-            if restored is not None:
-                return restored, 230
-        data["aid"] = aid
-    elif aname is not None:
-        data["aname"] = aname
-        logger.warning(
-            (
-                "Using aname to search for ANIME prevents cache from working"
-                "Consider using aid instead."
-            )
-        )
     return send(command, data, cb)
 
 
