@@ -65,5 +65,6 @@ def update(
     """
 
     global db
+    data["updated_at"] = datetime.now()
     db[collection].update_one(dict(_id=id), {"$set": data}, upsert=True)
     return restore(collection, id)  # type: ignore
