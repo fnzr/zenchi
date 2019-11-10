@@ -48,29 +48,33 @@ def setup(key: str) -> None:
     aes = AES.new(md5.digest(), AES.MODE_ECB)
 
 
-def encrypt(message: str) -> bytes:
+def encrypt(message: str, encoding: str) -> bytes:
     """Encrypt message to be sent to server. setup MUST be called first.
     
     :param message: message to be encrypted.
+    :type message: str
+    :param encoding:
     :type message: str
     :return: encrypted message to be sent
     :rtype: bytes
     """
     global aes
     message = pad(message)
-    bytes_message = bytes(message, settings.ANIDB_API_ENCODING)
+    bytes_message = bytes(message, encoding)
     return aes.encrypt(bytes_message)  # type: ignore
 
 
-def decrypt(message: bytes) -> str:
+def decrypt(message: bytes, encoding: str) -> str:
     """Decrypt message received from server. setup MUST be called first.
     
     :param message: message to be decrypted.
     :type message: bytes
+    :param encoding:
+    :type message: str
     :return: decrypted message
     :rtype: str
     """
     global aes
     plain_bytes = aes.decrypt(message)
-    padded_plain = plain_bytes.decode(settings.ANIDB_API_ENCODING)
+    padded_plain = plain_bytes.decode(encoding)
     return unpad(padded_plain)

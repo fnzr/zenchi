@@ -7,6 +7,7 @@ import sys
 import pymongo
 import logging
 from datetime import datetime
+import zenchi.settings
 
 _db: Any = None
 MAX_SERVER_DELAY = 5000
@@ -31,7 +32,9 @@ def setup() -> Any:
     :rtype: None
     """
     global _db
-    client = pymongo.MongoClient(serverSelectionTimeoutMS=MAX_SERVER_DELAY)
+    client = pymongo.MongoClient(
+        zenchi.settings.MONGODB_URI, serverSelectionTimeoutMS=MAX_SERVER_DELAY
+    )
     try:
         client.admin.command("ismaster")
         _db = client.anidb_cache

@@ -34,6 +34,7 @@ PacketParameters = Dict[str, Union[str, int]]
 
 _conn: Optional[socket.socket] = None
 _encryptedsession = False
+_encoding = "UTF8"
 session = ""
 
 PUBLIC_COMMANDS = ["PING", "ENCRYPT", "ENCODING", "AUTH", "VERSION"]
@@ -153,22 +154,21 @@ def send(
 
     global _encryptedsession
     if _encryptedsession:
-        packet = crypto.encrypt(data)
+        packet = crypto.encrypt(data, _encoding)
     else:
-        packet = data.encode(settings.ANIDB_API_ENCODING)
+        packet = data.encode(_encoding)
     socket.send(packet)
     raw_response = next(_listen_incoming_packets())
 
     if _encryptedsession:
-        api_response = crypto.decrypt(raw_response)
+        api_response = crypto.decrypt(raw_response, _encoding)
     else:
-        api_response = raw_response.decode(settings.ANIDB_API_ENCODING)
+        api_response = raw_response.decode(_encoding)
     logger.debug(api_response)
 
     code = int(api_response[:3])
     result = callback(code, api_response)
     if result is not None:
-        logger.debug(result)
         return result, code
     if code == 505:
         raise errors.IllegalParameterError
@@ -206,6 +206,7 @@ def auth(
     client_name: str = "",
     client_version: str = "",
     nat: bool = False,
+    encoding: str = "UTF8",
 ) -> EndpointResult:
     """Create a new session for authentication.
 
@@ -221,6 +222,8 @@ def auth(
     :type client_version: str, optional
     :param nat: should request nat info, defaults to False
     :type nat: bool, optional
+    :param encoding: encoding to be used during the session. Default to UTF8
+    :type encoding: str, optional
     :raises errors.ClientOutdatedError:
     :raises errors.ClientBannedError:
     :raises ValueError: raised if any of the parameters is not set
@@ -230,13 +233,15 @@ def auth(
         :nat Optional[str]: Present only if nat=1. String `ip:port`.
     :rtype: EndpointResult
     """
-    data = {
+    global _enconding
+    _encoding = encoding
+    data: Dict[str, Union[str, int]] = {
         "user": value_or_error("ANIDB_USERNAME", username),
         "pass": value_or_error("ANIDB_PASSWORD", password),
         "client": value_or_error("ZENCHI_CLIENTNAME", client_name),
         "clientver": value_or_error("ZENCHI_CLIENTVERSION", client_version),
         "protover": PROTOVER_PARAMETER,
-        "enc": settings.ANIDB_API_ENCODING,
+        "enc": _encoding,
     }
 
     if nat:
