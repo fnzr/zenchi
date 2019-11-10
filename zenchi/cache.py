@@ -33,7 +33,9 @@ def setup() -> None:
         pass
 
 
-def restore(collection: str, id: Union[str, int]) -> Optional[Dict[str, Any]]:
+def restore(
+    collection: str, id: Union[str, int, Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
     """Restrieve cached data from database.
     
     :param collection: The collection to be retrieved. Same name as API commands.
@@ -46,7 +48,9 @@ def restore(collection: str, id: Union[str, int]) -> Optional[Dict[str, Any]]:
     global db
     if db is None:
         return None
-    return db[collection].find_one(dict(_id=id), dict(_id=0))  # type: ignore
+    if not isinstance(id, dict):
+        id = dict(_id=id)
+    return db[collection].find_one(id, dict(_id=0))  # type: ignore
 
 
 def update(
