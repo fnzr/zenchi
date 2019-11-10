@@ -33,8 +33,8 @@ EndpointResult = Tuple[EndpointDict, int]
 PacketParameters = Dict[str, Union[str, int]]
 
 _conn: Optional[socket.socket] = None
-_encrypted_session = False
-_session = ""
+_encryptedsession = False
+session = ""
 
 PUBLIC_COMMANDS = ["PING", "ENCRYPT", "ENCODING", "AUTH", "VERSION"]
 
@@ -140,8 +140,8 @@ def send(
     :rtype: EndpointResult
     """
     if command not in PUBLIC_COMMANDS:
-        if _session:
-            args["s"] = _session
+        if session:
+            args["s"] = session
         else:
             raise ValueError(
                 "Trying to send a command that requires a session without calling auth() first"
@@ -151,15 +151,15 @@ def send(
     data = f"{command} {message}"
     logger.info("Sending %s", data)
 
-    global _encrypted_session
-    if _encrypted_session:
+    global _encryptedsession
+    if _encryptedsession:
         packet = crypto.encrypt(data)
     else:
         packet = data.encode(settings.ANIDB_API_ENCODING)
     socket.send(packet)
     raw_response = next(_listen_incoming_packets())
 
-    if _encrypted_session:
+    if _encryptedsession:
         api_response = crypto.decrypt(raw_response)
     else:
         api_response = raw_response.decode(settings.ANIDB_API_ENCODING)
@@ -250,9 +250,9 @@ def auth(
             raise errors.ClientBannedError(reason)
         if code in (200, 201):
             parts = response.split(" ")
-            global _session
-            _session = parts[1]
-            result = dict(session=_session)
+            global session
+            session = parts[1]
+            result = dict(session=session)
             if nat:
                 result["nat"] = parts[2]
             return result
@@ -273,8 +273,8 @@ def logout() -> EndpointResult:
 
     def cb(code: int, response: str) -> Optional[EndpointDict]:
         if code in (403, 203):
-            global _session
-            _session = ""
+            global session
+            session = ""
             return dict(message=response[3:].strip())
         return None
 
@@ -284,7 +284,7 @@ def logout() -> EndpointResult:
 def encrypt(username: str = "", api_key: str = "", type: int = 1) -> EndpointResult:
     """Enable encrypted communication with the server until new connection or logout.
 
-    See https://wiki.anidb.net/w/UDP_API_Definition#ENCRYPT:_Start_Encrypted_Session
+    See https://wiki.anidb.net/w/UDP_API_Definition#ENCRYPT:_Start_Encryptedsession
     
     :param username: anidb user. Defaults to environment ANIDB_USERNAME
     :type username: str, optional
@@ -308,8 +308,8 @@ def encrypt(username: str = "", api_key: str = "", type: int = 1) -> EndpointRes
         if code == 209:
             salt = response.split(" ")[1].strip()
             crypto.setup(api_key + salt)  # type: ignore
-            global _encrypted_session
-            _encrypted_session = True
+            global _encryptedsession
+            _encryptedsession = True
             logger.info("Successfully registered encryption.")
             return dict(salt=salt)
         return None
@@ -320,7 +320,7 @@ def encrypt(username: str = "", api_key: str = "", type: int = 1) -> EndpointRes
 def encoding(name: str) -> EndpointResult:
     """Set the encoding for the session. Should be used only when restoring existing session.
 
-    See https://wiki.anidb.net/w/UDP_API_Definition#ENCODING:_Change_Encoding_for_Session # noqa
+    See https://wiki.anidb.net/w/UDP_API_Definition#ENCODING:_Change_Encoding_forsession # noqa
 
     TODO: is it even possible to "restore" a session?
     
@@ -620,4 +620,86 @@ def creator(creatorid: int) -> EndpointResult:
     entry = cache.restore(command, creatorid)
     if entry is None:
         return send(command, dict(creatorid=creatorid), cb)
+    return entry, 233
+
+
+def episode(
+    eid: int = 0, aid: int = 0, aname: str = "", epno: str = ""
+) -> EndpointResult:
+    """Retrieve episode information from server.
+
+    See https://wiki.anidb.net/w/UDP_API_Definition#EPISODE:_Retrieve_Episode_Data
+
+    Required parameters must be one of:
+        - eid
+        - aid and epno
+        - aname and epno
+
+    
+    :param eid: anidb episode id
+    :type eid: int, optional
+    :param aid: anidb anime id
+    :type aid: int, optional
+    :param aname: anime name
+    :type aname: str, optional
+    :param epno: episode number. See docs for special chracter prefix.
+    :type epno: int, optional
+    :raises ValueError: raised if none of the parameters combinations are send.
+    :return: a tuple (data, code). data is a dictionary with the keys:
+        if code == 340:
+            :message str: NO SUCH EPISODE
+        if code == 245:                    
+            :eid int:
+            :aid int:
+            :length int:
+            :rating int:
+            :votes int:
+            :epno str:
+            :eng str:
+            :romaji str:
+            :kanji str:
+            :aired": int:
+            :type: int:
+    :rtype: EndpointResult
+    """
+    criteria: Union[int, Dict[str, Any]]
+    if eid:
+        criteria = dict(eid=eid)
+    elif aid and epno:
+        criteria = dict(aid=aid, epno=epno)
+    elif aname and epno:
+        criteria = dict(aname=aname, epno=epno)
+        logger.warning(
+            "Searching episode by aname bypasses the cache. Consider using aid."
+        )
+    else:
+        raise ValueError("At least one must be set: eid|aid and epno|aname and epno")
+
+    command = "EPISODE"
+
+    def cb(code: int, response: str) -> Optional[EndpointDict]:
+        if code == 340:
+            return dict(message=response[3:].strip())
+        if code == 240:
+            parts = response.splitlines()[1].split("|")
+            result: Dict[str, Union[str, int]] = {
+                "eid": int(parts[0]),
+                "aid": int(parts[1]),
+                "length": int(parts[2]),
+                "rating": int(parts[3]),
+                "votes": int(parts[4]),
+                "epno": parts[5],
+                "eng": parts[6],
+                "romaji": parts[7],
+                "kanji": parts[8],
+                "aired": int(parts[9]),
+                "type": int(parts[10]),
+            }
+            cache.update(command, result["eid"], result)
+            return result
+        return None
+
+    entry = cache.restore(command, criteria)
+    if entry is None:
+        return send(command, criteria, cb)
     return entry, 233
