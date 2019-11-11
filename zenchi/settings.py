@@ -1,30 +1,29 @@
 """Settings dump."""
 import sys
+import os
 from typing import TypeVar
-from environs import Env
 
 T = TypeVar("T")
 this = sys.modules[__name__]
 
-env = Env()
-env.read_env()
+ANIDB_SERVER = os.getenv("ANIDB_SERVER", "")
+ANIDB_PORT = int(os.getenv("ANIDB_PORT", 0))
 
-ANIDB_SERVER = env.str("ANIDB_SERVER", "")
-ANIDB_PORT = env.int("ANIDB_PORT", 0)
+ANIDB_USERNAME = os.getenv("ANIDB_USERNAME", "")
+ANIDB_PASSWORD = os.getenv("ANIDB_PASSWORD", "")
 
-ANIDB_USERNAME = env.str("ANIDB_USERNAME", "")
-ANIDB_PASSWORD = env.str("ANIDB_PASSWORD", "")
+ANIDB_ENCRYPT_API_KEY = os.getenv("ANIDB_ENCRYPT_API_KEY", "")
 
-ANIDB_ENCRYPT_API_KEY = env.str("ANIDB_ENCRYPT_API_KEY", "")
+ZENCHI_CLIENTNAME = os.getenv("ZENCHI_CLIENTNAME", "")
+ZENCHI_CLIENTVERSION = os.getenv("ZENCHI_CLIENTVERSION", "")
 
-ZENCHI_CLIENTNAME = env.str("ZENCHI_CLIENTNAME", "")
-ZENCHI_CLIENTVERSION = env.str("ZENCHI_CLIENTVERSION", "")
-
-MONGODB_URI = env.str("MONGODB_URI", "mongodb://localhost:27017")
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 
 
 def value_or_error(env_name: str, value: T) -> T:
     """Shorthand method to get the value of a variable from environment.
+
+    Unlike os.getenv, only check value at env_name if value is Falsy.
 
     :param env_name: name of environment variable to default to if value is not set.
     :type env_name: str
