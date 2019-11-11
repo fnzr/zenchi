@@ -1,16 +1,16 @@
-from distutils.core import setup
+import setuptools
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-setup(
+setuptools.setup(
     name="zenchi",
     packages=["zenchi", "zenchi.mappings"],
-    version="1.0.0",
+    version="1.0.1",
     license="MIT",
     description="python interface for communication with AniDB API",
-    long_description=long_description,
     long_description_content_type="text/markdown",
+    long_description=long_description,
     author="fnzr",
     author_email="5471818+fnzr@users.noreply.github.com",
     url="https://github.com/fnzr/zenchi",
