@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Union
 import pymongo
 import logging
 from datetime import datetime
-import zenchi.settings
+import zenchi.settings as settings
 
 _db: Any = None
 MAX_SERVER_DELAY = 5000
@@ -21,22 +21,25 @@ def _get_connection() -> Any:
     return _db
 
 
-def setup() -> Any:
+def setup(uri: str = "", database: str = "anidb_cache") -> Any:
     """Create connection to mongo database.
 
     Will send an warning if the connection is not successfull, but will proceed just fine.
     You really should use some kind of cache though.
 
-    :return: [description]
-    :rtype: None
+    :param uri: connection URI, defaults to environment MONGODB_URI
+    :type uri: str, optional
+    :param database: database name, defaults to 'anidb_cache'
+    :type database: str, optional
+    :return: database connection if connected, otheriwse False
+    :rtype: Any
     """
     global _db
-    client = pymongo.MongoClient(
-        zenchi.settings.MONGODB_URI, serverSelectionTimeoutMS=MAX_SERVER_DELAY
-    )
+    mongo_uri = settings.value_or_error("MONGODB_URI", uri)
+    client = pymongo.MongoClient(mongo_uri, serverSelectionTimeoutMS=MAX_SERVER_DELAY)
     try:
         client.admin.command("ismaster")
-        _db = client.anidb_cache
+        _db = client[database]
     except pymongo.errors.ConnectionFailure:
         logger.warn("Could not connect to cache server. This is highly unadvised.")
         _db = False

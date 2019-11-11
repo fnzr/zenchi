@@ -6,13 +6,13 @@ from typing import (
     Tuple,
     Union,
     Optional,
-    Iterator,
-    TypeVar,
+    Iterator
 )
 import socket
 import logging
 from time import sleep
 from zenchi import cache, settings
+from zenchi.settings import value_or_error
 import zenchi.mappings as mappings
 from zenchi.mappings import int_list
 import zenchi.crypto as crypto
@@ -24,8 +24,6 @@ logger = logging.getLogger(__name__)
 MAX_RECEIVE_SIZE = 4096
 PROTOVER_PARAMETER = 3
 
-
-T = TypeVar("T")
 EndpointDict = Dict[str, Any]
 EndpointResult = Tuple[EndpointDict, int]
 PacketParameters = Dict[str, Union[str, int]]
@@ -36,25 +34,6 @@ _encoding = "UTF8"
 _session = ""
 
 PUBLIC_COMMANDS = ["PING", "ENCRYPT", "ENCODING", "AUTH", "VERSION"]
-
-
-def value_or_error(env_name: str, value: T) -> T:
-    """Shorthand method to check is a variable has appropriate value.
-
-    :param env_name: name of environment variable to default to if value is not set.
-    :type env_name: str
-    :param value: the provided value of the variable.
-    :type value: T
-    :raises ValueError: raised if neither value not Environment Variable is set.
-    :return: the value to be used by the variable in the proper context.
-    :rtype: T
-    """
-    if value:
-        return value
-    env_value: T = settings.__dict__[env_name]
-    if env_value:
-        return env_value
-    raise ValueError(f"{env_name} is required but is not in env nor was a parameter")
 
 
 def _listen_incoming_packets() -> Iterator[bytes]:

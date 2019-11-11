@@ -150,7 +150,7 @@ def filter_cached(input: int, aid: int) -> int:
     """
     if not aid:
         return input
-    entry = cache.restore("anime", aid)
+    entry = cache.restore("ANIME", aid)
     if entry is None:
         return input
     for i in range(56):
