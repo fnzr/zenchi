@@ -1,6 +1,6 @@
 # zenchi
 
-zenchi is a python3 application that communicates with AniDB UDP API. It provides an interface to convert that raw responses string into python objects. It does very little by itself and its only intention is to parse data for other applications to work with.
+zenchi is a python3 application that communicates with AniDB UDP API. It provides an interface to convert raw responses strings into python objects. It does very little by itself and its only intention is to parse data for other applications to use.
 
 Currently, only Data commands are supported.
 
