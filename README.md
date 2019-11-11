@@ -65,9 +65,11 @@ The `ANIME` command receives a mask as parameter to filter the anime data. zench
 
 ## Cache
 
-zenchi uses a very basic optional MongoDB database as cache, named `anidb_cache` (TODO: allow changing this). It uses the environment variable `MONGODB_URI` to check the connection string. If the variable is not set, a warning will be issued and all cache usage will be ignored (highly unadvised, as per AniDB specifications).
+zenchi uses a very basic optional MongoDB database as cache, named `anidb_cache`. It uses the environment variable `MONGODB_URI` to check the connection string. If the variable is not set, a warning will be issued and all cache usage will be ignored (highly unadvised, as per AniDB specifications).
 
 Any operations that use the cache have the parameter `use_cache` that defaults to `True`. You can set this to `False` to skip the cache for that specific command (for example, when you want to update the cached data). All cached data also returns a `updated_at` key (see example above), which is the last time that data was updated in the database.
+
+If you don't want to use `anidb_cache` or `MONGODB_URI`, manually call `zenchi.cache.setup` with the appropriate values before sending requests to the API.
 
 
 ## Features
