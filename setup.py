@@ -14,7 +14,7 @@ setup(
     author="fnzr",
     author_email="5471818+fnzr@users.noreply.github.com",
     url="https://github.com/fnzr/zenchi",
-    download_url="https://github.com/fnzr/zenchi/archive/v1.0.0.tar.gz",
+    download_url="https://github.com/fnzr/zenchi/archive/v1.0.1.tar.gz",
     keywords=["anime", "anidb", "udp api"],
     install_requires=["environs", "pymongo", "pycryptodome"],
     classifiers=[
