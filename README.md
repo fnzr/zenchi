@@ -17,9 +17,7 @@ Fairly straightforward:
 >>> import zenchi
 >>> zenchi.create_socket(
         anidb_server='api.anidb.net',
-        anidb_port=9000,
-        client_name='devel',
-        client_version=1)
+        anidb_port=9000)
 <socket.socket ...>
 >>> zenchi.ping(nat=1)
 ({'port': 25065}, 300)
@@ -58,7 +56,7 @@ The `ANIME` command receives a mask as parameter to filter the anime data. zench
 
 ```python
 >>> import zenchi.mappings.anime as amask
->>> zenchi.anime(amask.aid | amask.romaji_name | amask.english_name | amask.short_name | amask.year, aid=3433) 
+>>> zenchi.anime(amask.aid | amask.romaji_name | amask.english_name | amask.short_name | amask.year, aid=3433)
 ({'aid': 3433, 'english_name': 'Mushi-Shi', 'romaji_name': 'Mushishi', 'short_name': ['Mushi'], 'updated_at': datetime.datetime(2019, 11, 10, 19, 55, 18, 1000), 'year': '2005-2006'}, 230)
 ```
 
@@ -81,4 +79,4 @@ Feel free to send PRs or request something in the issues.
 
 This project is under MIT License.
 
-For data collection and usage, make sure to read [AniDB Policies](https://anidb.net/policy) 
+For data collection and usage, make sure to read [AniDB Policies](https://anidb.net/policy)
