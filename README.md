@@ -15,9 +15,7 @@ Fairly straightforward:
 
 ```python
 >>> import zenchi
->>> zenchi.create_socket(
-        anidb_server='api.anidb.net',
-        anidb_port=9000)
+>>> zenchi.create_socket(anidb_server='api.anidb.net', anidb_port=9000)
 <socket.socket ...>
 >>> zenchi.ping(nat=1)
 ({'port': 25065}, 300)
