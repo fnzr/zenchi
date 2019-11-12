@@ -6,7 +6,7 @@ Currently, only Data commands are supported.
 
 ## Installing
 
-TODO.
+```pip install -U zenchi```
 
 
 ## Usage
