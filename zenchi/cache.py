@@ -51,9 +51,9 @@ def setup(uri: str = "", database: str = "anidb_cache") -> Any:
         # caused by calling setup without pymongo installed.
         # warning already issued above, so this can be ignored.
         _db = False
-    except pymongo.errors.ConnectionFailure:
+    except (pymongo.errors.ConnectionFailure, pymongo.errors.ConfigurationError):
         logger.warn(
-            "Could not connect to cache server. Proceeding without cache. This is highly unadvised."
+            "Could not connect to cache database. Proceeding without cache. This is highly unadvised."
         )
         _db = False
     return _db
