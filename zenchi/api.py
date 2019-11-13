@@ -398,7 +398,7 @@ def anime(
         filtered_mask = mappings.anime.filter_cached(amask, aid)
     else:
         filtered_mask = amask
-    data: PacketParameters = dict(amask=format(filtered_mask, "x"))
+    data: PacketParameters = dict(amask=format(filtered_mask, "014x"))
     if aid:
         if filtered_mask == 0:
             restored = cache.restore(command, aid)
