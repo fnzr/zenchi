@@ -35,18 +35,31 @@ _session = ""
 
 PUBLIC_COMMANDS = ["PING", "ENCRYPT", "ENCODING", "AUTH", "VERSION"]
 
+_default_timeout = 5
+_timeout = _default_timeout
+
+
+def set_timeout(seconds: int) -> None:
+    """Set time before raising a socket timeout error.
+
+    :param seconds: time in seconds
+    :type seconds: int
+    :rtype: None
+    """
+    global _timeout
+    _timeout = seconds
+
 
 def _listen_incoming_packets() -> Iterator[bytes]:
     """Wait until received a packet from the server.
 
-    TODO: this hangs indefinetely if no data is received.
-
     :return: The raw data from the server.
     :rtype: Iterator[bytes]
     """
+    global _timeout
     s = get_socket()
-    s.settimeout(30)
     while True:
+        s.settimeout(_timeout)
         yield s.recv(MAX_RECEIVE_SIZE)
     return b""
 
