@@ -16,7 +16,7 @@ setuptools.setup(
     url="https://github.com/fnzr/zenchi",
     download_url="https://github.com/fnzr/zenchi/archive/v1.1.0.tar.gz",
     keywords=["anime", "anidb", "udp api"],
-    install_requires=["pymongo", "pycryptodome"],
+    install_requires=["pycryptodome"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

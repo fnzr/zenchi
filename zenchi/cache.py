@@ -3,15 +3,20 @@
 Really, I just dump it on the database.
 """
 from typing import Any, Dict, Optional, Union
-import pymongo
 import logging
 from datetime import datetime
 import zenchi.settings as settings
 
+logger = logging.getLogger(__name__)
+try:
+    import pymongo
+except ImportError:
+    logger.warn(
+        "Module pymongo could not be found. Proceeding without cache. This is highly unadvised."
+    )
+
 _db: Any = None
 MAX_SERVER_DELAY = 5000
-
-logger = logging.getLogger(__name__)
 
 
 def _get_connection() -> Any:
@@ -36,12 +41,20 @@ def setup(uri: str = "", database: str = "anidb_cache") -> Any:
     """
     global _db
     mongo_uri = settings.value_or_error("MONGODB_URI", uri)
-    client = pymongo.MongoClient(mongo_uri, serverSelectionTimeoutMS=MAX_SERVER_DELAY)
     try:
+        client = pymongo.MongoClient(
+            mongo_uri, serverSelectionTimeoutMS=MAX_SERVER_DELAY
+        )
         client.admin.command("ismaster")
         _db = client[database]
+    except NameError:
+        # caused by calling setup without pymongo installed.
+        # warning already issued above, so this can be ignored.
+        _db = False
     except pymongo.errors.ConnectionFailure:
-        logger.warn("Could not connect to cache server. This is highly unadvised.")
+        logger.warn(
+            "Could not connect to cache server. Proceeding without cache. This is highly unadvised."
+        )
         _db = False
     return _db
 
