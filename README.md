@@ -50,10 +50,10 @@ If these values are set, the socket is created automatically and it's much simpl
 
 ### Anime masks
 
-The `ANIME` command receives a mask as parameter to filter the anime data. zenchi provides an easy way to create these masks with the module `zenchi.mappings.anime`.
+The `ANIME` command receives a mask as parameter to filter the anime data. zenchi provides an easy way to create these masks with the module `zenchi.mappings.anime.mask`.
 
 ```python
->>> import zenchi.mappings.anime as amask
+>>> import zenchi.mappings.anime.mask as amask
 >>> zenchi.anime(amask.aid | amask.romaji_name | amask.english_name | amask.short_name | amask.year, aid=3433)
 ({'aid': 3433, 'english_name': 'Mushi-Shi', 'romaji_name': 'Mushishi', 'short_name': ['Mushi'], 'updated_at': datetime.datetime(2019, 11, 10, 19, 55, 18, 1000), 'year': '2005-2006'}, 230)
 ```

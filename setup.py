@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name="zenchi",
     packages=["zenchi", "zenchi.mappings"],
-    version="1.1.0",
+    version="1.2.0",
     license="MIT",
     description="python interface for communication with AniDB API",
     long_description_content_type="text/markdown",
@@ -14,7 +14,7 @@ setuptools.setup(
     author="fnzr",
     author_email="5471818+fnzr@users.noreply.github.com",
     url="https://github.com/fnzr/zenchi",
-    download_url="https://github.com/fnzr/zenchi/archive/v1.1.0.tar.gz",
+    download_url="https://github.com/fnzr/zenchi/archive/v1.2.0.tar.gz",
     keywords=["anime", "anidb", "udp api"],
     install_requires=["pycryptodome"],
     classifiers=[
