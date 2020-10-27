@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="zenchi",
-    packages=["zenchi", "zenchi.mappings"],
+    packages=["zenchi", "zenchi.mappings", "zenchi.mappings.anime"],
     version="1.2.0",
     license="MIT",
     description="python interface for communication with AniDB API",
